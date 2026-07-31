@@ -29,6 +29,7 @@ cargo test -p clob-program --test compute -- --nocapture
 | cancel one order | 2 | 842 |
 | cancel 8 orders | 2 | 5,991 |
 | single fill, with event receipt | 4 | 2,755 |
+| swap, 3 levels, unfunded taker | 8 | 7,135 |
 
 Two things to read off this table. Posting is nearly flat in book depth — 476 CU into an
 empty book against 702 into a 64-order book — which is the red-black tree's `O(log n)`
@@ -77,8 +78,30 @@ funds were deposited beforehand and settlement happens inside the market account
 (`PlaceOrder` accepts two more to opt into an event receipt; see above.)
 
 Aggregators price account count into routing, and two is the floor. The trade-off is
-that a taker must pre-fund; an atomic deposit-swap-withdraw for unfunded takers is a
-separate instruction that has not been built yet.
+that the caller must pre-fund, which is right for a market maker holding inventory on
+the venue and wrong for a wallet routed through once — that is what `Swap` is for.
+
+## Swap: trading without a balance
+
+`Swap` deposits, matches and withdraws in one instruction, for callers who hold nothing
+on the market. Eight accounts against `PlaceOrder`'s two: the honest price of not
+pre-funding.
+
+Three things it gets right that the naive version does not:
+
+**Only the swap's own proceeds leave.** Withdrawing everything free at the end would
+drain the standing balance of any trader who is also a maker here. The handler records
+the seat's balances before matching and returns the difference — everything, for a
+caller with no seat; exactly the trade, for one with inventory.
+
+**The input is computed, not supplied.** The caller names a limit price and a size, and
+the program moves in the most that can cost. A caller-supplied amount is one more thing
+that can disagree with the order it funds. This is why a swap must be priced: an
+unpriced market buy has no bounded cost.
+
+**A seat created by a swap is released again.** Otherwise an aggregator routing
+strangers through would fill the trader table with empty seats and eventually lock
+everyone out.
 
 ## Design notes
 
@@ -120,6 +143,7 @@ account. Worth knowing if you add a code path that constructs a market.
 | 7 | CancelAllOrders | market, trader (signer) |
 | 8 | CollectFees | market, quote vault, fee recipient, vault signer, token program |
 | 9 | LogEvent | log authority (signer). Emitted by this program, never sent directly |
+| 10 | Swap | market, trader (signer), trader base, trader quote, base vault, quote vault, vault signer, token program |
 
 Deposit and withdraw amounts are in **lots, not atoms**. Atoms would mean rounding down
 to whole lots and stranding the remainder in the vault, where it would belong to nobody
@@ -127,9 +151,9 @@ and break reconciliation between vault balance and recorded deposits.
 
 ## Not yet built
 
-An atomic swap instruction for unfunded takers, a permissionless seat-manager program,
-and market creation from the client side. The `InitializeMarket` handler validates and
-writes; allocating the account is still the client's job.
+A permissionless seat-manager program, and market creation from the client side. The
+`InitializeMarket` handler validates and writes; allocating the account is still the
+client's job.
 
 ## License
 
