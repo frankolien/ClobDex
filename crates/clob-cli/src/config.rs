@@ -92,3 +92,14 @@ pub fn read_keypair(path: &Path) -> Result<Keypair> {
     }
     Keypair::try_from(&bytes[..]).map_err(|e| anyhow::anyhow!("{} is not a valid keypair: {e}", path.display()))
 }
+
+/// Writes a keypair in the same format, so the Solana CLI can read it back.
+pub fn write_keypair(path: &Path, keypair: &Keypair) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let bytes = keypair.to_bytes().to_vec();
+    std::fs::write(path, serde_json::to_string(&bytes)?)
+        .with_context(|| format!("cannot write keypair to {}", path.display()))?;
+    Ok(())
+}
