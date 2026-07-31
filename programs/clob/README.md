@@ -154,11 +154,22 @@ Deposit and withdraw amounts are in **lots, not atoms**. Atoms would mean roundi
 to whole lots and stranding the remainder in the vault, where it would belong to nobody
 and break reconciliation between vault balance and recorded deposits.
 
+## Creating a market
+
+`InitializeMarket` validates an account it is handed; it does not allocate one.
+Allocation needs a `CreateAccount` signed by the payer *and* by the new account's
+keypair, which a program cannot produce — and folding it in would mean the same
+instruction both chooses the size and checks it, which is not a check.
+
+`clob_client::setup::create_market` builds the whole six-instruction sequence.
+`tests/end_to_end.rs` runs it under LiteSVM and then trades on the result, which is the
+only test here that would catch a mistake in how the pieces fit together rather than a
+mistake inside one of them.
+
 ## Not yet built
 
-A permissionless seat-manager program, and market creation from the client side. The
-`InitializeMarket` handler validates and writes; allocating the account is still the
-client's job.
+A permissionless seat-manager program, so a maker can claim a seat on a market whose
+trader table is full without the authority's involvement.
 
 ## License
 

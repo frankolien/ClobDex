@@ -69,6 +69,17 @@ rather than guessed at.
 aggregate totals stay exact, so the correct response is to reconstruct the tail from
 account diffs rather than record a short trade.
 
+**`setup::create_market`** builds the six instructions that take a market from nothing:
+allocate the market account, allocate and initialise both vaults, initialise the market.
+Rent is a parameter rather than a constant, because rent is a cluster value the client
+reads from an RPC and hard-coding today's number into an SDK is how a deploy breaks
+eighteen months later.
+
+The SPL Token bits — `InitializeAccount3` and the 165-byte account size — are written out
+by hand rather than pulled from `spl-token`, which is a large dependency for an SDK to
+carry for one instruction and one number. `tests/setup.rs` checks both against the real
+thing, so `spl-token` is a dev-dependency and nothing more.
+
 ## Receipts are opt-in
 
 `Receipt::On` adds the log authority and program to the account list and a bump byte to
