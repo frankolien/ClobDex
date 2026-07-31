@@ -11,3 +11,4 @@ extern crate std;
 
 pub mod order;
 pub mod quantities;
+pub mod tree;
