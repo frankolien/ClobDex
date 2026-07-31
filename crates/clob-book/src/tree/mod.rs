@@ -20,6 +20,7 @@
 //! save a dozen loads per lookup at the cost of something that can desynchronise during
 //! a rebalance. Measure before adding it.
 
+mod insert;
 mod invariants;
 mod node;
 mod rotate;
