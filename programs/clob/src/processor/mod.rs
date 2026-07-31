@@ -3,6 +3,7 @@
 mod log;
 mod market;
 mod seat;
+mod swap;
 mod trade;
 
 use pinocchio::account::AccountView;
@@ -30,6 +31,7 @@ pub fn process(program_id: &Address, accounts: &mut [AccountView], data: &[u8]) 
         Discriminant::ReduceOrder => trade::reduce_order(program_id, accounts, &mut reader),
         Discriminant::CancelAllOrders => trade::cancel_all(program_id, accounts, &mut reader),
         Discriminant::LogEvent => log::log_event(program_id, accounts, rest),
+        Discriminant::Swap => swap::swap(program_id, accounts, &mut reader),
     }
 }
 

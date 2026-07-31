@@ -42,6 +42,9 @@ pub enum Discriminant {
     /// nothing, and exists only so the payload lands in the transaction's inner
     /// instruction data where it cannot be truncated.
     LogEvent = 9,
+    /// Deposit, match and withdraw in one instruction, for callers who hold no balance
+    /// on the market.
+    Swap = 10,
 }
 
 impl Discriminant {
@@ -62,6 +65,7 @@ impl Discriminant {
             7 => Ok(Self::CancelAllOrders),
             8 => Ok(Self::CollectFees),
             9 => Ok(Self::LogEvent),
+            10 => Ok(Self::Swap),
             _ => Err(ClobError::UnknownInstruction),
         }
     }

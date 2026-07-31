@@ -72,13 +72,13 @@ pub fn place_order(
     };
 
     if let (Some(bump), Ok(authority)) = (log_bump, at(rest, 1)) {
-        emit(program_id, authority, bump, &events, &outcome, seat)?;
+        emit_receipt(program_id, authority, bump, &events, &outcome, seat)?;
     }
     Ok(())
 }
 
 /// Calls back into this program so the event lands in inner instruction data.
-fn emit(
+pub(super) fn emit_receipt(
     program_id: &Address,
     authority: &AccountView,
     bump: u8,
@@ -193,7 +193,7 @@ pub fn cancel_all(
 }
 
 #[inline(always)]
-fn to_bytes(address: &Address) -> [u8; 32] {
+pub(super) fn to_bytes(address: &Address) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(address.as_ref());
     bytes
