@@ -13,6 +13,11 @@
 //! [`Discriminant::LogEvent`](crate::instruction::Discriminant::LogEvent) call and gets
 //! the whole event.
 //!
+//! `tests/event_roundtrip.rs` closes the loop: it sends a real signed transaction and
+//! decodes the payload back out of the transaction record with a parser written against
+//! the documented layout rather than against this encoder, so a drift between the two
+//! fails the suite.
+//!
 //! # Why the log authority
 //!
 //! [`LogEvent`](crate::processor::log_event) requires a program-derived signer. Only

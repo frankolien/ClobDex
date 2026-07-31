@@ -9,12 +9,10 @@
 //! receipt-form order that succeeds is one whose `LogEvent` call was accepted by the
 //! runtime with a valid program-derived signature.
 //!
-//! What is *not* covered is reading the bytes back out of the transaction record.
-//! Mollusk 0.14 gates `inner_instructions` behind a feature whose dependency does not
-//! resolve — it requires a version of `solana-transaction-status-client-types` that is
-//! only published as a prerelease. Closing that gap needs either a fixed Mollusk or a
-//! validator-backed test, and it should be closed before an indexer is written against
-//! this format.
+//! Reading the bytes back out of a transaction record is covered separately, in
+//! `event_roundtrip.rs`. Mollusk 0.14 cannot do it — its `inner_instructions` field is
+//! behind a feature whose dependency does not resolve — so those tests run under
+//! LiteSVM instead.
 
 mod common;
 

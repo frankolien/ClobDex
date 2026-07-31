@@ -64,11 +64,16 @@ Fills beyond `MAX_LOGGED_FILLS` (24) are dropped from the per-fill detail and a
 truncation flag is set. Aggregate totals stay exact either way, so an indexer knows when
 it must reconstruct the tail from account diffs rather than having to guess.
 
-**Not yet verified end to end:** reading the payload back out of a transaction record.
-Mollusk 0.14 gates `inner_instructions` behind a feature whose dependency does not
-resolve. The encoding is unit-tested byte by byte and emission is proven by the signed
-CPI succeeding, but the round trip should be closed before an indexer is written against
-this format.
+The round trip is verified end to end. `tests/event_roundtrip.rs` sends a real signed
+transaction through LiteSVM and decodes the event from the transaction's inner
+instructions — the same place a Geyser stream or an RPC `getTransaction` response
+surfaces it. The parser there is written against the documented field layout rather than
+by reusing the encoder, so a change one side makes and the other does not is a test
+failure rather than a silently mirrored bug. Swapping two adjacent fields in the encoder
+fails two of the six tests.
+
+Mollusk runs the rest of the event tests but cannot do this one: its `inner_instructions`
+field sits behind a feature whose dependency does not resolve. Hence two harnesses.
 
 ## Two accounts to trade
 
