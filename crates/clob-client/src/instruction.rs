@@ -214,6 +214,27 @@ pub fn claim_seat(addresses: &MarketAddresses, trader: &Pubkey) -> Instruction {
     }
 }
 
+/// Returns an empty seat to the market, making room for a new trader.
+///
+/// Permissionless: no signature from the evicted trader, and none needed. The
+/// instruction only succeeds on a seat holding nothing at all, and losing an empty seat
+/// costs its owner nothing — claiming is free and idempotent. Requiring a signature
+/// would put the market's liveness in the hands of the people who have already stopped
+/// participating.
+///
+/// Use [`MarketState::evictable_seats`](crate::MarketState::evictable_seats) to find
+/// candidates without guessing.
+pub fn evict_seat(addresses: &MarketAddresses, trader: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: addresses.program_id,
+        accounts: vec![
+            AccountMeta::new(addresses.market, false),
+            AccountMeta::new_readonly(*trader, false),
+        ],
+        data: Data::new(Discriminant::EvictSeat).into_vec(),
+    }
+}
+
 /// Moves tokens in and credits a seat. Amounts are in lots, which convert to atoms
 /// exactly — atoms would round down and strand the remainder in the vault.
 pub fn deposit(

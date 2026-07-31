@@ -104,6 +104,18 @@ fn cancel_and_reduce_round_trip() {
 }
 
 #[test]
+fn evict_seat_round_trips_and_asks_for_no_signature() {
+    let instruction = instruction::evict_seat(&addresses(), &key(9));
+    let (tag, _) = parse(&instruction);
+
+    assert_eq!(tag, Discriminant::EvictSeat);
+    assert_eq!(instruction.data.len(), 1, "the target is an account, not a field");
+    // The point of the instruction: the evicted trader does not sign.
+    assert!(!instruction.accounts[1].is_signer);
+    assert_eq!(instruction.accounts[1].pubkey, key(9));
+}
+
+#[test]
 fn cancel_all_round_trips() {
     let instruction = instruction::cancel_all_orders(&addresses(), &key(9), Side::Ask, 12);
     let (tag, mut reader) = parse(&instruction);

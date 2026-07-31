@@ -214,6 +214,36 @@ impl MarketState {
         bid.checked_add(ask).map(|sum| sum / 2)
     }
 
+    /// Seats holding nothing, which anyone may evict to make room.
+    ///
+    /// Worth checking before giving up on a full market: a table can fill with seats
+    /// belonging to traders who claimed one and never came back, and those are exactly
+    /// the seats [`evict_seat`](crate::instruction::evict_seat) exists to reclaim.
+    ///
+    /// A seat with a resting order is never listed — posting locks funds, so a live
+    /// quote means a non-zero balance.
+    pub fn evictable_seats(&self) -> Vec<TraderKey> {
+        self.traders
+            .iter()
+            .filter(|(_, state)| state.is_empty())
+            .map(|(key, _)| *key)
+            .collect()
+    }
+
+    /// Whether the trader table is full, so a new trader needs a seat freed first.
+    pub fn seats_are_full(&self) -> bool {
+        self.traders.len() >= self.seat_capacity()
+    }
+
+    /// How many seats this market was created with.
+    pub fn seat_capacity(&self) -> usize {
+        match self.size_class {
+            SizeClass::Small => 32,
+            SizeClass::Medium => 128,
+            SizeClass::Large => 512,
+        }
+    }
+
     /// Balances for a trader, if they hold a seat.
     pub fn trader(&self, key: &TraderKey) -> Option<&TraderState> {
         self.traders.iter().find(|(k, _)| k == key).map(|(_, v)| v)
