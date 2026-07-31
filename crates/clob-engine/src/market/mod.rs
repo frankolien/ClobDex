@@ -1,5 +1,6 @@
 //! The market: configuration, seats, and the book, in one castable value.
 
+mod funds;
 mod header;
 
 use bytemuck::{Pod, Zeroable};
