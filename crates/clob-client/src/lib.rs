@@ -49,8 +49,10 @@
 pub mod address;
 pub mod event;
 pub mod instruction;
+pub mod setup;
 pub mod state;
 
 pub use event::{EventError, FillRecord, OrderPlaced};
 pub use instruction::{MarketAddresses, Receipt, TOKEN_PROGRAM_ID};
+pub use setup::{CreateMarketParams, MarketSetup, TOKEN_ACCOUNT_LEN, create_market};
 pub use state::{BookOrder, DecodeError, Level, MarketState, Sweep};

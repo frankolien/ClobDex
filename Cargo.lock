@@ -695,6 +695,8 @@ dependencies = [
  "proptest",
  "solana-instruction",
  "solana-pubkey 4.2.0",
+ "solana-system-interface",
+ "spl-token",
 ]
 
 [[package]]
