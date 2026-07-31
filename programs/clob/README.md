@@ -28,6 +28,7 @@ cargo test -p clob-program --test compute -- --nocapture
 | market order, 64 levels | 2 | 69,388 |
 | cancel one order | 2 | 842 |
 | cancel 8 orders | 2 | 5,991 |
+| single fill, with event receipt | 4 | 2,755 |
 
 Two things to read off this table. Posting is nearly flat in book depth — 476 CU into an
 empty book against 702 into a 64-order book — which is the red-black tree's `O(log n)`
@@ -41,12 +42,39 @@ per-instruction CU figures are unpublished, and the "45% lower than Phoenix" fig
 circulates for Manifest is an analyst claim, not a benchmark. Treat the table above as a
 baseline to defend, not as a win.
 
+## Events
+
+Program logs are capped per transaction and truncated when they overflow — exactly when
+a sweep is deep enough to be worth reading. So a receipt is emitted by calling back into
+this program instead, which puts the payload in *inner instruction data*, returned in
+full in the transaction meta and not subject to the log budget.
+
+`LogEvent` requires a program-derived signer. Only this program can make its own PDA a
+signer, so no user transaction and no other program can forge an event under this
+program's id — passing the right address is not enough, it has to actually sign.
+
+**Emission is opt-in.** The receipt costs 1,546 CU and two extra accounts, which more
+than triples the cost of a single fill. A market maker cancel-replacing continuously
+already knows what it submitted; a taker or aggregator wants the receipt. Appending the
+log authority and the program to the account list turns it on, so the cheap path stays
+cheap without a second discriminant.
+
+Fills beyond `MAX_LOGGED_FILLS` (24) are dropped from the per-fill detail and a
+truncation flag is set. Aggregate totals stay exact either way, so an indexer knows when
+it must reconstruct the tail from account diffs rather than having to guess.
+
+**Not yet verified end to end:** reading the payload back out of a transaction record.
+Mollusk 0.14 gates `inner_instructions` behind a feature whose dependency does not
+resolve. The encoding is unit-tested byte by byte and emission is proven by the signed
+CPI succeeding, but the round trip should be closed before an indexer is written against
+this format.
+
 ## Two accounts to trade
 
-`PlaceOrder`, `CancelOrder`, `ReduceOrder` and `CancelAllOrders` each take exactly two
-accounts: the market and the trader's signature. No token accounts, no vaults, no token
-program — funds were deposited beforehand and settlement happens inside the market
-account.
+`PlaceOrder`, `CancelOrder`, `ReduceOrder` and `CancelAllOrders` take two accounts: the
+market and the trader's signature. No token accounts, no vaults, no token program —
+funds were deposited beforehand and settlement happens inside the market account.
+(`PlaceOrder` accepts two more to opt into an event receipt; see above.)
 
 Aggregators price account count into routing, and two is the floor. The trade-off is
 that a taker must pre-fund; an atomic deposit-swap-withdraw for unfunded takers is a
@@ -86,11 +114,12 @@ account. Worth knowing if you add a code path that constructs a market.
 | 1 | ClaimSeat | market, trader (signer) |
 | 2 | Deposit | market, trader (signer), trader base, trader quote, base vault, quote vault, token program |
 | 3 | Withdraw | + vault signer |
-| 4 | PlaceOrder | market, trader (signer) |
+| 4 | PlaceOrder | market, trader (signer), + log authority and program for a receipt |
 | 5 | CancelOrder | market, trader (signer) |
 | 6 | ReduceOrder | market, trader (signer) |
 | 7 | CancelAllOrders | market, trader (signer) |
 | 8 | CollectFees | market, quote vault, fee recipient, vault signer, token program |
+| 9 | LogEvent | log authority (signer). Emitted by this program, never sent directly |
 
 Deposit and withdraw amounts are in **lots, not atoms**. Atoms would mean rounding down
 to whole lots and stranding the remainder in the vault, where it would belong to nobody
@@ -98,11 +127,9 @@ and break reconciliation between vault balance and recorded deposits.
 
 ## Not yet built
 
-Event emission via self-CPI (so indexers read inner-instruction data rather than
-truncatable program logs), an atomic swap instruction for unfunded takers, a
-permissionless seat-manager program, and market creation from the client side. The
-`InitializeMarket` handler validates and writes; allocating the account is still the
-client's job.
+An atomic swap instruction for unfunded takers, a permissionless seat-manager program,
+and market creation from the client side. The `InitializeMarket` handler validates and
+writes; allocating the account is still the client's job.
 
 ## License
 
