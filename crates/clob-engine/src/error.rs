@@ -43,6 +43,8 @@ pub enum EngineError {
     InvalidFeeRate,
     /// The market's lot geometry is invalid.
     InvalidLotConfig(LotConfigError),
+    /// `initialize` was called on a market that is not blank.
+    MarketAlreadyInitialized,
 }
 
 impl core::fmt::Display for EngineError {
@@ -64,6 +66,7 @@ impl core::fmt::Display for EngineError {
             Self::Overflow => f.write_str("arithmetic overflow"),
             Self::InvalidFeeRate => f.write_str("fee rate exceeds 100%"),
             Self::InvalidLotConfig(inner) => write!(f, "invalid lot config: {inner}"),
+            Self::MarketAlreadyInitialized => f.write_str("market is already initialized"),
         }
     }
 }

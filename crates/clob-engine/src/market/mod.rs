@@ -93,6 +93,32 @@ impl<const BIDS: usize, const ASKS: usize, const SEATS: usize> Market<BIDS, ASKS
         Ok(market)
     }
 
+    /// Initializes an already-zeroed market in place.
+    ///
+    /// [`Market::new`] builds a whole market *by value*, which at realistic capacities
+    /// is hundreds of kilobytes on the stack — far past the 4 KiB frame limit an SBF
+    /// program gets. On-chain the account already arrives zeroed, and a zeroed market
+    /// is a valid empty market, so initialization only has to write the configuration.
+    /// This is the constructor a Solana program must use.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::MarketAlreadyInitialized`] if the market is not blank, or
+    /// [`EngineError::InvalidLotConfig`] / [`EngineError::InvalidFeeRate`].
+    pub fn initialize(&mut self, lot_config: LotConfig, fees: FeeSchedule) -> Result<()> {
+        // Refusing a non-blank market keeps this from being a way to rewrite the lot
+        // geometry of a live book, which would revalue every resting order at once.
+        if self.header != MarketHeader::default()
+            || !self.traders.is_empty()
+            || !self.book.is_empty(Side::Bid)
+            || !self.book.is_empty(Side::Ask)
+        {
+            return Err(EngineError::MarketAlreadyInitialized);
+        }
+        self.header = MarketHeader::new(lot_config, fees)?;
+        Ok(())
+    }
+
     /// Configuration and running totals.
     #[inline(always)]
     pub const fn header(&self) -> &MarketHeader {
