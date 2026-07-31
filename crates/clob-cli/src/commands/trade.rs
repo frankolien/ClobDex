@@ -65,6 +65,42 @@ pub fn place(
     Ok(())
 }
 
+/// Swaps against the book without needing a seat or a prior deposit.
+pub fn swap(
+    client: &Client,
+    cluster: &str,
+    side: Side,
+    price_in_ticks: u64,
+    base_lots: u64,
+    receipt: bool,
+) -> Result<()> {
+    let record = MarketRecord::load(cluster)?;
+    let addresses = record.addresses()?;
+    let (payer_base, payer_quote) = record.payer_token_accounts()?;
+
+    let signature = client.send(
+        &[instruction::swap(
+            &addresses,
+            &client.payer_key(),
+            &payer_base,
+            &payer_quote,
+            side,
+            Ticks(price_in_ticks),
+            BaseLots(base_lots),
+            // No minimum: a partial fill is a fine outcome for generating traffic, and
+            // a swap that reverts teaches the indexer nothing.
+            BaseLots::ZERO,
+            64,
+            if receipt { Receipt::On } else { Receipt::Off },
+        )],
+        &[],
+    )?;
+
+    println!("swap {side:?} up to {base_lots} lots, limit {price_in_ticks} ticks");
+    println!("signature {signature}");
+    Ok(())
+}
+
 /// Cancels every resting order on one side.
 pub fn cancel_all(client: &Client, cluster: &str, side: Side, limit: u32) -> Result<()> {
     let record = MarketRecord::load(cluster)?;

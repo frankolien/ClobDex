@@ -63,6 +63,18 @@ enum Command {
         #[arg(long)]
         receipt: bool,
     },
+    /// Trade against the book without a seat.
+    Swap {
+        /// Which side the taker is on.
+        side: OrderSide,
+        /// Limit price in ticks.
+        price: u64,
+        /// Size in base lots.
+        size: u64,
+        /// Emit an event receipt.
+        #[arg(long)]
+        receipt: bool,
+    },
     /// Cancel every resting order on one side.
     CancelAll {
         /// Which side to clear.
@@ -101,6 +113,9 @@ fn main() -> Result<()> {
         Command::Fund { base, quote } => commands::trade::fund(&client, &cli.cluster, base, quote),
         Command::Order { side, price, size, receipt } => {
             commands::trade::place(&client, &cli.cluster, side.into(), price, size, receipt)
+        }
+        Command::Swap { side, price, size, receipt } => {
+            commands::trade::swap(&client, &cli.cluster, side.into(), price, size, receipt)
         }
         Command::CancelAll { side, limit } => {
             commands::trade::cancel_all(&client, &cli.cluster, side.into(), limit)
