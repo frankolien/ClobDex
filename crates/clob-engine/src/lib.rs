@@ -13,4 +13,4 @@ pub mod error;
 pub mod trader;
 
 pub use error::{EngineError, Result};
-pub use trader::{TraderKey, TraderState};
+pub use trader::{NO_SEAT, SeatIndex, TraderKey, TraderState, TraderTable};
