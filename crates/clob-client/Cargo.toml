@@ -1,0 +1,24 @@
+[package]
+name = "clob-client"
+version = "0.1.0"
+description = "Client SDK for the ClobDex spot market: instruction builders, account decoding, and event parsing."
+keywords = ["clob", "solana", "sdk", "orderbook", "indexer"]
+categories = ["api-bindings", "finance"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+clob-book = { path = "../clob-book" }
+clob-engine = { path = "../clob-engine" }
+# Depends on the program crate rather than restating the wire format. Two copies of a
+# byte layout is how a client and a program drift apart; one copy cannot.
+clob-program = { path = "../../programs/clob" }
+solana-instruction = "3"
+solana-pubkey = { version = "4", features = ["curve25519", "sha2"] }
+
+[dev-dependencies]
+proptest.workspace = true

@@ -685,6 +685,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "clob-client"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "clob-book",
+ "clob-engine",
+ "clob-program",
+ "proptest",
+ "solana-instruction",
+ "solana-pubkey 4.2.0",
+]
+
+[[package]]
 name = "clob-engine"
 version = "0.1.0"
 dependencies = [
@@ -699,6 +712,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "clob-book",
+ "clob-client",
  "clob-engine",
  "litesvm",
  "mollusk-svm",
