@@ -27,6 +27,12 @@
 
 pub mod error;
 pub mod event;
+
+/// The error type [`instruction::Reader`] returns, re-exported so a client can name it
+/// without depending on Pinocchio directly.
+pub mod pinocchio_error {
+    pub use pinocchio::error::ProgramError;
+}
 pub mod instruction;
 pub mod processor;
 pub mod state;

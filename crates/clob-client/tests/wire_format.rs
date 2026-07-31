@@ -277,3 +277,120 @@ proptest! {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------
+// Decoding: anything the SDK builds, it recognises
+// ---------------------------------------------------------------------------------
+
+use clob_client::decode::{self, ClobInstruction, InstructionDecodeError};
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    /// Build then decode is the identity. This is what lets an indexer trust that what
+    /// it read off the chain is the order that was actually submitted.
+    #[test]
+    fn order_packets_survive_a_build_decode_round_trip(packet in packet(), receipt in any::<bool>()) {
+        let wanted = if receipt { Receipt::On } else { Receipt::Off };
+        let built = instruction::place_order(&addresses(), &key(9), &packet, wanted);
+
+        prop_assert_eq!(
+            decode::decode(&built.data),
+            Ok(ClobInstruction::PlaceOrder { packet, receipt })
+        );
+    }
+}
+
+#[test]
+fn every_builder_decodes_back_to_what_it_was_given() {
+    let a = addresses();
+    let id = FIFOOrderId::new(Side::Ask, Ticks(700), 42);
+    let lots = LotConfig::new(1_000, 2_000, 1_000_000, 1).unwrap();
+
+    let cases: Vec<(Instruction, ClobInstruction)> = vec![
+        (
+            instruction::initialize_market(&a, &key(5), &key(6), &key(7), &key(8), SizeClass::Large, &lots, 7),
+            ClobInstruction::InitializeMarket {
+                size_class: SizeClass::Large,
+                lot_config: lots,
+                taker_fee_bps: 7,
+            },
+        ),
+        (instruction::claim_seat(&a, &key(9)), ClobInstruction::ClaimSeat),
+        (
+            instruction::deposit(&a, &key(9), &key(10), &key(11), BaseLots(30), QuoteLots(5_000)),
+            ClobInstruction::Deposit { base_lots: BaseLots(30), quote_lots: QuoteLots(5_000) },
+        ),
+        (
+            instruction::withdraw(&a, &key(9), &key(10), &key(11), BaseLots(1), QuoteLots(2)),
+            ClobInstruction::Withdraw { base_lots: BaseLots(1), quote_lots: QuoteLots(2) },
+        ),
+        (instruction::cancel_order(&a, &key(9), &id), ClobInstruction::CancelOrder { order_id: id }),
+        (
+            instruction::reduce_order(&a, &key(9), &id, BaseLots(4)),
+            ClobInstruction::ReduceOrder { order_id: id, base_lots: BaseLots(4) },
+        ),
+        (
+            instruction::cancel_all_orders(&a, &key(9), Side::Ask, 12),
+            ClobInstruction::CancelAllOrders { side: Side::Ask, limit: 12 },
+        ),
+        (instruction::collect_fees(&a, &key(9)), ClobInstruction::CollectFees),
+        (instruction::evict_seat(&a, &key(9)), ClobInstruction::EvictSeat),
+        (
+            instruction::swap(&a, &key(9), &key(10), &key(11), Side::Bid, Ticks(105), BaseLots(25), BaseLots(20), 16, Receipt::On),
+            ClobInstruction::Swap {
+                side: Side::Bid,
+                price_in_ticks: Ticks(105),
+                num_base_lots: BaseLots(25),
+                min_base_lots_to_fill: BaseLots(20),
+                match_limit: 16,
+                receipt: true,
+            },
+        ),
+    ];
+
+    for (built, expected) in cases {
+        assert_eq!(decode::decode(&built.data), Ok(expected), "decoding {:?}", built.data[0]);
+    }
+}
+
+#[test]
+fn the_taker_side_is_readable_without_replaying_anything() {
+    // What an observer needs first: which half of the book a transaction consumed.
+    let a = addresses();
+
+    let taking = decode::decode(
+        &instruction::place_order(&a, &key(9), &instruction::market_order(Side::Bid, BaseLots(1), 8), Receipt::Off).data,
+    )
+    .unwrap();
+    assert_eq!(taking.taker_side(), Some(Side::Bid));
+
+    let posting = decode::decode(
+        &instruction::place_order(
+            &a,
+            &key(9),
+            &instruction::post_only(Side::Bid, Ticks(1), BaseLots(1), PostOnlyRejection::Reject),
+            Receipt::Off,
+        )
+        .data,
+    )
+    .unwrap();
+    assert_eq!(posting.taker_side(), None, "post-only never takes");
+    assert!(posting.can_post());
+
+    let cancelling = decode::decode(&instruction::cancel_order(&a, &key(9), &FIFOOrderId::default()).data).unwrap();
+    assert_eq!(cancelling.taker_side(), None);
+}
+
+#[test]
+fn unparseable_data_is_reported_rather_than_guessed_at() {
+    assert_eq!(decode::decode(&[]), Err(InstructionDecodeError::Empty));
+    assert_eq!(decode::decode(&[250]), Err(InstructionDecodeError::UnknownDiscriminant(250)));
+    // Right discriminant, missing fields.
+    assert_eq!(decode::decode(&[5u8, 1, 2]), Err(InstructionDecodeError::Truncated));
+    // A size class this build does not know.
+    let mut bad = vec![0u8];
+    bad.extend_from_slice(&99u64.to_le_bytes());
+    bad.extend_from_slice(&[0u8; 40]);
+    assert_eq!(decode::decode(&bad), Err(InstructionDecodeError::Malformed));
+}
