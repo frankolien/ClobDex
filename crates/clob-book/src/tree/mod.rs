@@ -20,12 +20,14 @@
 //! save a dozen loads per lookup at the cost of something that can desynchronise during
 //! a rebalance. Measure before adding it.
 
+mod invariants;
 mod node;
 
 use core::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
 
+pub use invariants::Invariant;
 pub use node::{Entry, Handle, NIL, Node};
 
 use node::BLACK;
