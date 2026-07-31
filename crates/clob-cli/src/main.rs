@@ -35,6 +35,12 @@ enum Command {
         #[arg(long, default_value_t = 2)]
         fee_bps: u64,
     },
+    /// Print the book.
+    Show {
+        /// Price levels per side.
+        #[arg(long, default_value_t = 10)]
+        depth: usize,
+    },
     /// Print the payer and its SOL balance.
     Balance,
 }
@@ -45,6 +51,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Command::CreateMarket { fee_bps } => commands::market::create(&client, &cli.cluster, fee_bps),
+        Command::Show { depth } => commands::market::show(&client, &cli.cluster, depth),
         Command::Balance => {
             println!("payer   {}", client.payer_key());
             println!("balance {:.4} SOL", client.balance()? as f64 / 1e9);

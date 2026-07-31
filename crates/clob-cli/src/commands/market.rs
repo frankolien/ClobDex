@@ -1,8 +1,9 @@
 //! Creating a market from nothing, and reading one back.
 
-use anyhow::Result;
-use clob_book::LotConfig;
+use anyhow::{Context, Result};
+use clob_book::{LotConfig, Side};
 use clob_client::setup::{CreateMarketParams, TOKEN_ACCOUNT_LEN, create_market};
+use clob_client::state::MarketState;
 use clob_program::state::SizeClass;
 use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
@@ -148,6 +149,47 @@ pub fn create(client: &Client, cluster: &str, taker_fee_bps: u64) -> Result<()> 
     println!("fee       {taker_fee_bps} bps");
     println!("signature {signature}");
     println!("saved to  {}", path.display());
+    Ok(())
+}
+
+/// Prints a market's book and parameters.
+pub fn show(client: &Client, cluster: &str, depth: usize) -> Result<()> {
+    let record = MarketRecord::load(cluster)?;
+    let addresses = record.addresses()?;
+
+    let data = client
+        .account_data(&addresses.market)?
+        .context("the market account does not exist on this cluster")?;
+    let state = MarketState::decode(&data).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+
+    println!("market {}", record.market);
+    println!("fee    {} bps", state.fees().taker_fee_bps);
+    // Written by the program on every fill. Zero after a crossing trade means the
+    // liquidity was removed without value changing hands — a self-trade.
+    println!("earned {} quote lots", state.header.collected_quote_lot_fees.as_u64());
+    // Occupied seats, and how many of those hold nothing and could be evicted to make
+    // room. An evictable seat is still a claimed seat, so it counts as occupied.
+    println!(
+        "seats  {} of {} claimed, {} evictable",
+        state.traders.len(),
+        state.seat_capacity(),
+        state.evictable_seats().len()
+    );
+    println!();
+
+    // Asks printed high-to-low above bids, so the spread sits in the middle the way a
+    // trader expects to read it.
+    let asks = state.level_two(Side::Ask, depth);
+    for level in asks.iter().rev() {
+        println!("  ask {:>12}  {:>12}", level.price_in_ticks.as_u64(), level.base_lots.as_u64());
+    }
+    match state.spread_in_ticks() {
+        Some(spread) => println!("      ---- spread {spread} ----"),
+        None => println!("      ---- one side empty ----"),
+    }
+    for level in state.level_two(Side::Bid, depth) {
+        println!("  bid {:>12}  {:>12}", level.price_in_ticks.as_u64(), level.base_lots.as_u64());
+    }
     Ok(())
 }
 
