@@ -42,6 +42,8 @@ pub enum ClobError {
     MarketDataUnaligned = 1012,
     /// A converted token amount exceeded `u64`.
     AmountOverflow = 1013,
+    /// The event signer was not this program's log authority.
+    InvalidLogAuthority = 1014,
 }
 
 impl From<ClobError> for ProgramError {

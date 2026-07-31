@@ -1,5 +1,6 @@
 //! Instruction dispatch and the account checks every handler shares.
 
+mod log;
 mod market;
 mod seat;
 mod trade;
@@ -28,6 +29,7 @@ pub fn process(program_id: &Address, accounts: &mut [AccountView], data: &[u8]) 
         Discriminant::CancelOrder => trade::cancel_order(program_id, accounts, &mut reader),
         Discriminant::ReduceOrder => trade::reduce_order(program_id, accounts, &mut reader),
         Discriminant::CancelAllOrders => trade::cancel_all(program_id, accounts, &mut reader),
+        Discriminant::LogEvent => log::log_event(program_id, accounts, rest),
     }
 }
 

@@ -38,6 +38,10 @@ pub enum Discriminant {
     CancelAllOrders = 7,
     /// Sweep accrued fees to the fee recipient.
     CollectFees = 8,
+    /// Event sink. Emitted by this program calling back into itself; the handler does
+    /// nothing, and exists only so the payload lands in the transaction's inner
+    /// instruction data where it cannot be truncated.
+    LogEvent = 9,
 }
 
 impl Discriminant {
@@ -57,6 +61,7 @@ impl Discriminant {
             6 => Ok(Self::ReduceOrder),
             7 => Ok(Self::CancelAllOrders),
             8 => Ok(Self::CollectFees),
+            9 => Ok(Self::LogEvent),
             _ => Err(ClobError::UnknownInstruction),
         }
     }
@@ -226,6 +231,14 @@ impl<'a> Reader<'a> {
     /// [`ClobError::InstructionDataTooShort`].
     pub fn quote_lots(&mut self) -> Result<QuoteLots, ProgramError> {
         Ok(QuoteLots(self.u64()?))
+    }
+
+    /// Reads a trailing optional byte, returning `None` if the data ends here.
+    ///
+    /// Used for fields that only the receipt form of an instruction carries, so the
+    /// common form stays byte-for-byte what it was.
+    pub fn optional_u8(&mut self) -> Option<u8> {
+        self.u8().ok()
     }
 }
 

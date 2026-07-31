@@ -38,6 +38,13 @@ pub const MARKET_VERSION: u64 = 1;
 /// Seed prefix for a market's vault signer.
 pub const VAULT_SIGNER_SEED: &[u8] = b"vault";
 
+/// Seed for the program-wide event signer.
+///
+/// Only this program can make its own PDA a signer, so requiring one on
+/// [`LogEvent`](crate::instruction::Discriminant::LogEvent) is what stops anyone else
+/// forging an event under this program's id.
+pub const LOG_AUTHORITY_SEED: &[u8] = b"log";
+
 /// Fixed-size preamble describing the market account.
 ///
 /// Addresses are stored as raw bytes rather than as `Address` so the header is `Pod`
