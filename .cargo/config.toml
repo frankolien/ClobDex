@@ -1,0 +1,5 @@
+# Mollusk loads the compiled SBF binary from here, so `cargo test` works without
+# callers having to remember to export it. Build it first with:
+#   cargo build-sbf --manifest-path programs/clob/Cargo.toml
+[env]
+SBF_OUT_DIR = { value = "target/deploy", relative = true }
