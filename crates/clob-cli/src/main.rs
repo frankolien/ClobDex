@@ -3,6 +3,7 @@
 mod config;
 mod rpc;
 mod spl;
+mod store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
