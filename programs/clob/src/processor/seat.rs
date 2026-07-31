@@ -35,6 +35,44 @@ pub fn claim(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResul
     Ok(())
 }
 
+/// Accounts: market, trader to evict (no signature required).
+///
+/// # Why this needs no signature
+///
+/// A seat table is finite, and a seat is free to claim. Without eviction, thirty-two
+/// wallets could claim every seat on a small market, never trade, and permanently lock
+/// out every maker — the seats would be held by exactly the people who have stopped
+/// participating and are least likely to sign anything.
+///
+/// So eviction is permissionless, and safe because it only ever succeeds on a seat
+/// holding nothing at all. Losing an empty seat costs its owner nothing: claiming is
+/// idempotent and free, and `deposit` re-claims on the way in. There is no window to
+/// exploit either, since claiming and funding happen in one transaction.
+///
+/// Note that "empty" covers resting orders too: posting locks funds, so a seat with a
+/// live quote has a non-zero balance and cannot be evicted.
+///
+/// # Errors
+///
+/// [`EngineError::SeatNotFound`](clob_engine::EngineError::SeatNotFound) if the trader
+/// has no seat, or [`EngineError::SeatNotEmpty`](clob_engine::EngineError::SeatNotEmpty)
+/// if it still holds funds or orders.
+pub fn evict(program_id: &Address, accounts: &mut [AccountView]) -> ProgramResult {
+    let (market_account, rest) = split_market(accounts)?;
+    expect_market_account(market_account, program_id)?;
+
+    let key = TraderKey(to_bytes(at(rest, 0)?.address()));
+
+    let mut data = market_account.try_borrow_mut()?;
+    let (header, market_bytes) = split_initialized(&mut data)?;
+    let size_class = SizeClass::from_u64(header.size_class)?;
+
+    dispatch_market!(size_class, market_bytes, |market| {
+        map_engine(market.release_seat(&key))?;
+    });
+    Ok(())
+}
+
 /// Accounts: market, trader (signer), trader base token account, trader quote token
 /// account, base vault, quote vault, token program.
 ///

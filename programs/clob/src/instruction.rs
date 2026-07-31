@@ -45,6 +45,8 @@ pub enum Discriminant {
     /// Deposit, match and withdraw in one instruction, for callers who hold no balance
     /// on the market.
     Swap = 10,
+    /// Return an empty seat to the market. Permissionless.
+    EvictSeat = 11,
 }
 
 impl Discriminant {
@@ -66,6 +68,7 @@ impl Discriminant {
             8 => Ok(Self::CollectFees),
             9 => Ok(Self::LogEvent),
             10 => Ok(Self::Swap),
+            11 => Ok(Self::EvictSeat),
             _ => Err(ClobError::UnknownInstruction),
         }
     }
