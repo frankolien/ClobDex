@@ -286,3 +286,123 @@ pub fn seed_depth(
             .expect("depth should rest");
     }
 }
+
+// ---------------------------------------------------------------------------------
+// SPL token fixtures
+//
+// The swap, deposit and withdraw instructions do real token CPI, so testing them means
+// running the actual SPL Token program rather than writing balances into the market by
+// hand.
+// ---------------------------------------------------------------------------------
+
+use mollusk_svm_programs_token::token;
+use spl_token::state::{Account as TokenAccount, AccountState, Mint};
+
+/// A Mollusk instance with the SPL Token program loaded.
+pub fn mollusk_with_token() -> Mollusk {
+    let mut mollusk = mollusk();
+    token::add_program(&mut mollusk);
+    mollusk
+}
+
+/// An initialised mint with no authority.
+pub fn mint_account(decimals: u8) -> Account {
+    token::create_account_for_mint(Mint {
+        mint_authority: solana_pubkey::Pubkey::default().into(),
+        supply: u64::MAX / 2,
+        decimals,
+        is_initialized: true,
+        freeze_authority: None.into(),
+    })
+}
+
+/// A token account holding `amount` of `mint`, owned by `owner`.
+pub fn token_account(mint: Pubkey, owner: Pubkey, amount: u64) -> Account {
+    token::create_account_for_token_account(TokenAccount {
+        mint,
+        owner,
+        amount,
+        delegate: None.into(),
+        state: AccountState::Initialized,
+        is_native: None.into(),
+        delegated_amount: 0,
+        close_authority: None.into(),
+    })
+}
+
+/// The token balance recorded in an account's data.
+pub fn token_balance(account: &Account) -> u64 {
+    u64::from_le_bytes(account.data[64..72].try_into().unwrap())
+}
+
+/// Encodes a `Swap`.
+#[allow(clippy::too_many_arguments)]
+pub fn swap_ix(
+    fixture: &Fixture,
+    trader: Pubkey,
+    trader_base: Pubkey,
+    trader_quote: Pubkey,
+    side: Side,
+    price: u64,
+    size: u64,
+    min_fill: u64,
+    match_limit: u32,
+) -> Instruction {
+    let mut data = vec![10u8, side as u8];
+    data.extend_from_slice(&price.to_le_bytes());
+    data.extend_from_slice(&size.to_le_bytes());
+    data.extend_from_slice(&min_fill.to_le_bytes());
+    data.extend_from_slice(&match_limit.to_le_bytes());
+
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(fixture.market, false),
+            AccountMeta::new_readonly(trader, true),
+            AccountMeta::new(trader_base, false),
+            AccountMeta::new(trader_quote, false),
+            AccountMeta::new(fixture.base_vault, false),
+            AccountMeta::new(fixture.quote_vault, false),
+            AccountMeta::new_readonly(fixture.vault_signer, false),
+            AccountMeta::new_readonly(token::ID, false),
+        ],
+        data,
+    }
+}
+
+/// Encodes a `Deposit` or `Withdraw`. Amounts are in lots.
+pub fn funds_ix(
+    fixture: &Fixture,
+    trader: Pubkey,
+    trader_base: Pubkey,
+    trader_quote: Pubkey,
+    withdraw: bool,
+    base_lots: u64,
+    quote_lots: u64,
+) -> Instruction {
+    let mut data = vec![if withdraw { 3u8 } else { 2u8 }];
+    data.extend_from_slice(&base_lots.to_le_bytes());
+    data.extend_from_slice(&quote_lots.to_le_bytes());
+
+    let mut accounts = vec![
+        AccountMeta::new(fixture.market, false),
+        AccountMeta::new_readonly(trader, true),
+        AccountMeta::new(trader_base, false),
+        AccountMeta::new(trader_quote, false),
+        AccountMeta::new(fixture.base_vault, false),
+        AccountMeta::new(fixture.quote_vault, false),
+    ];
+    if withdraw {
+        accounts.push(AccountMeta::new_readonly(fixture.vault_signer, false));
+    }
+    accounts.push(AccountMeta::new_readonly(
+        mollusk_svm_programs_token::token::ID,
+        false,
+    ));
+
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts,
+        data,
+    }
+}
