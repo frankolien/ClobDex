@@ -149,6 +149,7 @@ account. Worth knowing if you add a code path that constructs a market.
 | 8 | CollectFees | market, quote vault, fee recipient, vault signer, token program |
 | 9 | LogEvent | log authority (signer). Emitted by this program, never sent directly |
 | 10 | Swap | market, trader (signer), trader base, trader quote, base vault, quote vault, vault signer, token program |
+| 11 | EvictSeat | market, trader to evict (**no signature**) |
 
 Deposit and withdraw amounts are in **lots, not atoms**. Atoms would mean rounding down
 to whole lots and stranding the remainder in the vault, where it would belong to nobody
@@ -166,10 +167,28 @@ instruction both chooses the size and checks it, which is not a check.
 only test here that would catch a mistake in how the pieces fit together rather than a
 mistake inside one of them.
 
+## Seats are finite, so eviction is permissionless
+
+A seat table holds 32, 128 or 512 traders depending on the size class, and claiming a
+seat is free. Without a way to give one back, thirty-two wallets could claim every seat
+on a small market, never trade, and permanently lock out every maker — and those seats
+would be held by exactly the people least likely to sign anything.
+
+So `EvictSeat` takes no signature from the trader being evicted. It is safe because it
+only ever succeeds on a seat holding nothing at all: losing an empty seat costs its
+owner nothing, since claiming is idempotent and free and `Deposit` re-claims on the way
+in. There is no window to exploit either, because claiming and funding go in one
+transaction.
+
+"Empty" covers resting orders too — posting locks funds, so a live quote means a
+non-zero balance. `MarketState::evictable_seats` names the candidates so a client does
+not have to guess.
+
 ## Not yet built
 
-A permissionless seat-manager program, so a maker can claim a seat on a market whose
-trader table is full without the authority's involvement.
+An indexer. Everything the program side needs is in place; what is missing is the
+off-chain service that consumes account updates and transaction events into a queryable
+store.
 
 ## License
 

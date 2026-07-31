@@ -80,6 +80,12 @@ by hand rather than pulled from `spl-token`, which is a large dependency for an 
 carry for one instruction and one number. `tests/setup.rs` checks both against the real
 thing, so `spl-token` is a dev-dependency and nothing more.
 
+**`MarketState::evictable_seats`** names the seats anyone may reclaim on a full market.
+Seat tables are finite and seats are free to claim, so a market can fill with traders
+who claimed one and never came back; `instruction::evict_seat` reclaims those, and needs
+no signature from the trader being evicted because it only succeeds on a seat holding
+nothing.
+
 ## Receipts are opt-in
 
 `Receipt::On` adds the log authority and program to the account list and a bump byte to
