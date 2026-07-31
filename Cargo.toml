@@ -2,6 +2,13 @@
 resolver = "3"
 members = ["crates/clob-book", "crates/clob-client", "crates/clob-engine", "crates/clob-indexer", "programs/clob"]
 
+# clob-cli is a separate workspace, not a member. Cargo resolves one dependency graph
+# per workspace, including every member's dev-dependencies — so litesvm (pinned, and
+# needing wincode 0.5) and solana-client (needing wincode 0.6) would have to agree, and
+# they cannot. An on-chain program and an RPC client tool have no reason to share a
+# lockfile; keeping them apart is what lets each pick the versions it actually needs.
+exclude = ["crates/clob-cli"]
+
 [workspace.package]
 edition = "2024"
 license = "MIT"
