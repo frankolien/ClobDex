@@ -1,0 +1,191 @@
+//! Compute-unit measurements against the compiled SBF binary.
+//!
+//! Compute is the binding constraint on-chain, and it is the axis this venue has to
+//! compete on. These numbers come from Mollusk executing the real binary, so they are
+//! what a validator would charge — not an estimate.
+//!
+//! The tests assert *ceilings*, not exact values, so a refactor that makes something
+//! cheaper does not fail the suite while a regression does. Run with
+//! `cargo test -p clob-program --test compute -- --nocapture` to print the table.
+
+mod common;
+
+use clob_book::Side;
+use solana_instruction::Instruction;
+use solana_pubkey::Pubkey;
+
+use common::*;
+
+fn trader(id: u8) -> Pubkey {
+    Pubkey::new_from_array([100 + id; 32])
+}
+
+/// Runs one instruction and returns the compute units consumed.
+fn measure(
+    market_account: solana_account::Account,
+    signer: Pubkey,
+    instruction: &Instruction,
+    market: Pubkey,
+) -> u64 {
+    let result = mollusk().process_instruction(
+        instruction,
+        &[(market, market_account), (signer, wallet())],
+    );
+    assert!(
+        !result.program_result.is_err(),
+        "benchmark instruction failed: {:?}",
+        result.program_result
+    );
+    result.compute_units_consumed
+}
+
+/// A market with `depth` resting asks owned by the maker, from tick 100 upward.
+fn book_with_depth(depth: u64) -> (Fixture, solana_account::Account) {
+    let fixture = Fixture::new();
+    let mut account = fixture.market_account(2);
+    let maker = trader(1);
+    let taker = trader(2);
+    fixture.seat(&mut account, maker, 1_000_000, 1_000_000_000);
+    fixture.seat(&mut account, taker, 0, 1_000_000_000);
+    if depth > 0 {
+        seed_depth(&mut account, maker, Side::Ask, 100, depth, 10);
+    }
+    (fixture, account)
+}
+
+#[test]
+fn report() {
+    println!("\n  instruction                              accounts       CU");
+    println!("  ----------------------------------------------------------");
+
+    // Posting into an empty book: the floor for a maker action.
+    let (fixture, account) = book_with_depth(0);
+    let post_empty = measure(
+        account,
+        trader(1),
+        &post_only_ix(fixture.market, trader(1), Side::Ask, 100, 10),
+        fixture.market,
+    );
+    println!("  post-only, empty book                           2   {post_empty:>6}");
+
+    // Posting into a book that already has depth: the realistic maker case, where the
+    // red-black insert actually has to descend.
+    for depth in [16u64, 64] {
+        let (fixture, account) = book_with_depth(depth);
+        let cu = measure(
+            account,
+            trader(1),
+            &post_only_ix(fixture.market, trader(1), Side::Bid, 50, 10),
+            fixture.market,
+        );
+        println!("  post-only, {depth:>3} resting orders                  2   {cu:>6}");
+    }
+
+    // Taking: one price level, then a sweep. The slope between these is the marginal
+    // cost of a fill, which is the number that decides how deep a taker can sweep
+    // inside one transaction.
+    for levels in [1u64, 4, 16] {
+        let (fixture, account) = book_with_depth(levels);
+        let cu = measure(
+            account,
+            trader(2),
+            &market_order_ix(fixture.market, trader(2), Side::Bid, levels * 10, 64),
+            fixture.market,
+        );
+        println!("  market order, sweeping {levels:>2} level(s)             2   {cu:>6}");
+    }
+
+    // Cancelling, single and batched.
+    let (fixture, mut account) = book_with_depth(0);
+    seed_depth(&mut account, trader(1), Side::Bid, 90, 8, 10);
+    let id = newest_order(&account, Side::Bid);
+    let cancel_one = measure(
+        account.clone(),
+        trader(1),
+        &cancel_ix(fixture.market, trader(1), id),
+        fixture.market,
+    );
+    println!("  cancel one order                                2   {cancel_one:>6}");
+
+    let cancel_eight = measure(
+        account,
+        trader(1),
+        &cancel_all_ix(fixture.market, trader(1), Side::Bid, 8),
+        fixture.market,
+    );
+    println!("  cancel 8 orders                                 2   {cancel_eight:>6}");
+    println!();
+}
+
+#[test]
+fn a_maker_action_leaves_room_to_batch() {
+    // A market maker cancel-replaces continuously, so a single quote update has to be
+    // cheap enough that several fit in one 1.4M CU transaction alongside the signature
+    // and account-loading overhead. 50k gives room for well over a dozen.
+    let (fixture, account) = book_with_depth(64);
+    let cu = measure(
+        account,
+        trader(1),
+        &post_only_ix(fixture.market, trader(1), Side::Bid, 50, 10),
+        fixture.market,
+    );
+    assert!(cu < 50_000, "post-only cost {cu} CU into a 64-order book");
+}
+
+#[test]
+fn a_single_fill_leaves_room_to_sweep() {
+    let (fixture, account) = book_with_depth(1);
+    let cu = measure(
+        account,
+        trader(2),
+        &market_order_ix(fixture.market, trader(2), Side::Bid, 10, 8),
+        fixture.market,
+    );
+    assert!(cu < 50_000, "single fill cost {cu} CU");
+}
+
+#[test]
+fn sweeping_scales_linearly_rather_than_quadratically() {
+    // The property that matters for deep sweeps: cost per level must stay flat. A
+    // quadratic term would cap sweep depth far below the match_limit a client sets.
+    let (fixture, account) = book_with_depth(4);
+    let four = measure(
+        account,
+        trader(2),
+        &market_order_ix(fixture.market, trader(2), Side::Bid, 40, 64),
+        fixture.market,
+    );
+
+    let (fixture, account) = book_with_depth(16);
+    let sixteen = measure(
+        account,
+        trader(2),
+        &market_order_ix(fixture.market, trader(2), Side::Bid, 160, 64),
+        fixture.market,
+    );
+
+    // Four times the levels must cost well under four times the *marginal* budget plus
+    // a fixed overhead. Stated as a generous bound so it fails on a real regression
+    // rather than on noise.
+    let per_level_at_4 = four / 4;
+    let per_level_at_16 = sixteen / 16;
+    assert!(
+        per_level_at_16 < per_level_at_4 * 2,
+        "per-level cost grew from {per_level_at_4} to {per_level_at_16} CU"
+    );
+}
+
+#[test]
+fn a_full_sweep_fits_in_one_transaction() {
+    // 1.4M CU is the per-transaction ceiling. A taker must be able to clear meaningful
+    // depth without splitting across transactions.
+    let (fixture, account) = book_with_depth(64);
+    let cu = measure(
+        account,
+        trader(2),
+        &market_order_ix(fixture.market, trader(2), Side::Bid, 640, 128),
+        fixture.market,
+    );
+    assert!(cu < 1_400_000, "64-level sweep cost {cu} CU");
+    println!("64-level sweep: {cu} CU");
+}
