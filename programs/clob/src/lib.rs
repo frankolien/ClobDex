@@ -27,4 +27,12 @@
 
 pub mod error;
 pub mod instruction;
+pub mod processor;
 pub mod state;
+
+#[cfg(target_os = "solana")]
+mod entrypoint {
+    pinocchio::program_entrypoint!(crate::processor::process);
+    pinocchio::no_allocator!();
+    pinocchio::nostd_panic_handler!();
+}
