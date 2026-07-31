@@ -1,0 +1,21 @@
+[workspace]
+resolver = "3"
+members = ["crates/clob-book"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ClobDex/clobdex"
+rust-version = "1.85"
+
+[workspace.dependencies]
+bytemuck = { version = "1.23", default-features = false }
+proptest = "1.11"
+
+# Release profile tuned for on-chain (SBF) builds: overflow checks stay ON because
+# a panic on overflow is a transaction revert, which is the safe failure mode for a
+# venue holding user funds. Silent wrapping is not.
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1

@@ -1,0 +1,23 @@
+[package]
+name = "clob-book"
+version = "0.1.0"
+description = "Zero-copy, fixed-capacity limit order book primitives for on-chain CLOBs: a Pod red-black tree arena, price-time-priority order IDs, and exact tick/lot fixed-point math."
+keywords = ["orderbook", "clob", "solana", "zero-copy", "red-black-tree"]
+categories = ["data-structures", "no-std", "finance"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[features]
+default = ["std"]
+# `std` only enables heap-allocating constructors (`new_boxed`) and `std::error::Error`
+# impls. The core data structures are `no_std` and allocation-free.
+std = ["bytemuck/extern_crate_alloc"]
