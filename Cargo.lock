@@ -709,6 +709,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "clob-indexer"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "clob-book",
+ "clob-client",
+ "clob-engine",
+ "clob-program",
+ "proptest",
+]
+
+[[package]]
 name = "clob-program"
 version = "0.1.0"
 dependencies = [

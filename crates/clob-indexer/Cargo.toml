@@ -1,0 +1,21 @@
+[package]
+name = "clob-indexer"
+version = "0.1.0"
+description = "Derives the trade tape and book deltas for the ClobDex spot market from on-chain state."
+keywords = ["clob", "solana", "indexer", "orderbook"]
+categories = ["finance"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+clob-book = { path = "../clob-book" }
+clob-client = { path = "../clob-client" }
+clob-engine = { path = "../clob-engine" }
+
+[dev-dependencies]
+clob-program = { path = "../../programs/clob" }
+bytemuck.workspace = true
+proptest.workspace = true
