@@ -13,3 +13,6 @@
 #![warn(missing_docs)]
 
 pub mod address;
+pub mod instruction;
+
+pub use instruction::{MarketAddresses, Receipt, TOKEN_PROGRAM_ID};
