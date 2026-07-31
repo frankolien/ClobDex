@@ -11,8 +11,10 @@ extern crate std;
 
 pub mod error;
 pub mod fees;
+pub mod order;
 pub mod trader;
 
 pub use error::{EngineError, Result};
 pub use fees::{BPS_DENOMINATOR, FeeSchedule};
+pub use order::{OrderPacket, PostOnlyRejection, SelfTradeBehavior};
 pub use trader::{NO_SEAT, SeatIndex, TraderKey, TraderState, TraderTable};
