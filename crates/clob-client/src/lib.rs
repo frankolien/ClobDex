@@ -14,5 +14,7 @@
 
 pub mod address;
 pub mod instruction;
+pub mod state;
 
 pub use instruction::{MarketAddresses, Receipt, TOKEN_PROGRAM_ID};
+pub use state::{BookOrder, DecodeError, Level, MarketState, Sweep};
