@@ -4,6 +4,7 @@
 //! policy — no order types, no self-trade rules, no fees — only what an engine needs to
 //! read and mutate a book: placement, cancellation, reduction, top-of-book, and depth.
 
+mod depth;
 
 use bytemuck::{Pod, Zeroable};
 
