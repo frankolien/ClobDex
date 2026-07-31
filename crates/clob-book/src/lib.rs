@@ -9,4 +9,5 @@
 #[cfg(any(feature = "std", test))]
 extern crate std;
 
+pub mod order;
 pub mod quantities;
