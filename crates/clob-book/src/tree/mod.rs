@@ -23,6 +23,7 @@
 mod insert;
 mod invariants;
 mod node;
+mod remove;
 mod rotate;
 
 use core::mem::size_of;
