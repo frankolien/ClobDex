@@ -22,6 +22,7 @@
 
 mod insert;
 mod invariants;
+mod iter;
 mod node;
 mod remove;
 mod rotate;
@@ -31,6 +32,7 @@ use core::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 
 pub use invariants::Invariant;
+pub use iter::{Iter, IterRev};
 pub use node::{Entry, Handle, NIL, Node};
 
 use node::BLACK;
