@@ -411,3 +411,75 @@ impl<K: Pod + Ord, V: Pod, const N: usize> RedBlackTree<K, V, N> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Tree = RedBlackTree<u64, u64, 64>;
+
+    #[test]
+    fn zeroed_bytes_are_a_valid_empty_tree() {
+        let bytes = std::vec![0u8; Tree::SIZE_IN_BYTES];
+        let tree: &Tree = bytemuck::from_bytes(&bytes);
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.capacity(), 64);
+        assert_eq!(tree.min_handle(), NIL);
+        assert_eq!(tree.check(), Ok(()));
+    }
+
+    #[test]
+    fn size_is_the_header_plus_the_arena() {
+        // 16-byte header, 64 slots of (16 link bytes + 8 key + 8 value).
+        assert_eq!(Tree::SIZE_IN_BYTES, 16 + 64 * 32);
+    }
+
+    #[test]
+    fn survives_a_round_trip_through_raw_bytes() {
+        let mut tree = Tree::new_boxed();
+        for key in [5u64, 1, 9, 3] {
+            tree.insert(key, key * 10);
+        }
+
+        let bytes = bytemuck::bytes_of(tree.as_ref()).to_vec();
+        let restored: &Tree = bytemuck::from_bytes(&bytes);
+
+        assert_eq!(restored.check(), Ok(()));
+        assert_eq!(restored.get(&9), Some(&90));
+        assert_eq!(
+            restored.iter().map(|e| e.key).collect::<std::vec::Vec<_>>(),
+            std::vec![1, 3, 5, 9]
+        );
+    }
+
+    #[test]
+    fn navigation_terminates_at_both_ends() {
+        let mut tree = Tree::new_boxed();
+        for key in [1u64, 2, 3] {
+            tree.insert(key, key);
+        }
+
+        let (min, max) = (tree.min_handle(), tree.max_handle());
+        assert_eq!(tree.predecessor(min), NIL);
+        assert_eq!(tree.successor(max), NIL);
+        assert_eq!(tree.node(tree.successor(min)).key, 2);
+        assert_eq!(tree.node(tree.predecessor(max)).key, 2);
+    }
+
+    #[test]
+    fn clear_restores_full_capacity() {
+        let mut tree = Tree::new_boxed();
+        for key in 0..64u64 {
+            tree.insert(key, key);
+        }
+
+        tree.clear();
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.check(), Ok(()));
+        for key in 100..164u64 {
+            assert!(tree.insert(key, key).is_some());
+        }
+        assert_eq!(tree.check(), Ok(()));
+    }
+}

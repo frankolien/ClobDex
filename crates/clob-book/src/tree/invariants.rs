@@ -152,3 +152,52 @@ impl<K: Pod + Ord, V: Pod, const N: usize> RedBlackTree<K, V, N> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Tree = RedBlackTree<u64, u64, 16>;
+
+    #[test]
+    fn a_healthy_tree_passes() {
+        let mut tree = Tree::new_boxed();
+        for key in 0..16u64 {
+            tree.insert(key, key);
+        }
+        assert_eq!(tree.check(), Ok(()));
+    }
+
+    #[test]
+    fn detects_a_corrupted_root_colour() {
+        let mut tree = Tree::new_boxed();
+        tree.insert(1, 1);
+
+        let root = tree.root();
+        tree.node_mut(root).color = RED;
+
+        assert_eq!(tree.check(), Err(Invariant::RootNotBlack));
+    }
+
+    #[test]
+    fn detects_a_broken_ordering() {
+        let mut tree = Tree::new_boxed();
+        for key in 0..8u64 {
+            tree.insert(key, key);
+        }
+
+        // Rewrite a key in place, breaking the BST property without touching links.
+        let handle = tree.find(&0);
+        tree.node_mut(handle).key = 999;
+
+        assert_eq!(tree.check(), Err(Invariant::BstOrderViolation));
+    }
+
+    #[test]
+    fn detects_a_stale_length() {
+        let mut tree = Tree::new_boxed();
+        tree.insert(1, 1);
+        tree.increment_len();
+
+        assert_eq!(tree.check(), Err(Invariant::LenMismatch));
+    }
+}
