@@ -1,0 +1,22 @@
+[package]
+name = "clob-engine"
+version = "0.1.0"
+description = "Crankless matching engine and atomic settlement for on-chain CLOBs, built on clob-book."
+keywords = ["clob", "matching-engine", "solana", "orderbook", "zero-copy"]
+categories = ["no-std", "finance"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+clob-book = { path = "../clob-book", default-features = false }
+
+[dev-dependencies]
+proptest.workspace = true
+
+[features]
+default = ["std"]
+std = ["bytemuck/extern_crate_alloc", "clob-book/std"]

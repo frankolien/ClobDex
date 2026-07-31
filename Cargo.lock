@@ -50,6 +50,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clob-engine"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "clob-book",
+ "proptest",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"

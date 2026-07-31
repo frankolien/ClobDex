@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/clob-book"]
+members = ["crates/clob-book", "crates/clob-engine"]
 
 [workspace.package]
 edition = "2024"
