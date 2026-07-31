@@ -22,6 +22,7 @@
 
 mod invariants;
 mod node;
+mod rotate;
 
 use core::mem::size_of;
 
