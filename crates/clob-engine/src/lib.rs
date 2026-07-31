@@ -12,11 +12,13 @@ extern crate std;
 pub mod error;
 pub mod fees;
 pub mod fill;
+pub mod market;
 pub mod order;
 pub mod trader;
 
 pub use error::{EngineError, Result};
 pub use fees::{BPS_DENOMINATOR, FeeSchedule};
 pub use fill::{Fill, FillObserver, MatchStop, OrderOutcome};
+pub use market::{ConservationError, Market, MarketHeader};
 pub use order::{OrderPacket, PostOnlyRejection, SelfTradeBehavior};
 pub use trader::{NO_SEAT, SeatIndex, TraderKey, TraderState, TraderTable};
