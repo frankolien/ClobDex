@@ -151,6 +151,25 @@ fn trade_ix(market: Pubkey, trader: Pubkey, data: Vec<u8>) -> Instruction {
     }
 }
 
+/// The program-wide event signer.
+pub fn log_authority() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"log"], &PROGRAM_ID)
+}
+
+/// Rewrites a trade instruction into its receipt form: two more accounts and a trailing
+/// bump byte.
+pub fn with_receipt(mut instruction: Instruction) -> Instruction {
+    let (authority, bump) = log_authority();
+    instruction.data.push(bump);
+    instruction
+        .accounts
+        .push(AccountMeta::new_readonly(authority, false));
+    instruction
+        .accounts
+        .push(AccountMeta::new_readonly(PROGRAM_ID, false));
+    instruction
+}
+
 /// Encodes a `PlaceOrder` for a limit order.
 pub fn limit_order_ix(
     market: Pubkey,
