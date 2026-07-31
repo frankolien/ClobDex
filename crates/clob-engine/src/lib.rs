@@ -10,5 +10,7 @@
 extern crate std;
 
 pub mod error;
+pub mod trader;
 
 pub use error::{EngineError, Result};
+pub use trader::{TraderKey, TraderState};
