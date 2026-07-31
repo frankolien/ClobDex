@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 use clob_book::{BaseLots, FIFOOrderId, LotConfig, QuoteLots, Side, Ticks};
+use clob_client::instruction::{self as sdk, MarketAddresses, Receipt};
 use clob_engine::{FeeSchedule, Market};
 use mollusk_svm::Mollusk;
 use solana_account::Account;
@@ -140,17 +141,6 @@ pub fn wallet() -> Account {
 // Instruction builders
 // ---------------------------------------------------------------------------------
 
-fn trade_ix(market: Pubkey, trader: Pubkey, data: Vec<u8>) -> Instruction {
-    Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(market, false),
-            AccountMeta::new_readonly(trader, true),
-        ],
-        data,
-    }
-}
-
 /// The program-wide event signer.
 pub fn log_authority() -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"log"], &PROGRAM_ID)
@@ -170,7 +160,22 @@ pub fn with_receipt(mut instruction: Instruction) -> Instruction {
     instruction
 }
 
-/// Encodes a `PlaceOrder` for a limit order.
+/// Addresses for the fixture market, for the SDK builders.
+pub fn sdk_addresses(fixture: &Fixture) -> MarketAddresses {
+    MarketAddresses::new(
+        PROGRAM_ID,
+        fixture.market,
+        fixture.base_vault,
+        fixture.quote_vault,
+    )
+}
+
+/// Addresses when only the market matters.
+fn bare_addresses(market: Pubkey) -> MarketAddresses {
+    MarketAddresses::new(PROGRAM_ID, market, Pubkey::default(), Pubkey::default())
+}
+
+/// A limit order, built through the SDK.
 pub fn limit_order_ix(
     market: Pubkey,
     trader: Pubkey,
@@ -179,15 +184,17 @@ pub fn limit_order_ix(
     size: u64,
     match_limit: u32,
 ) -> Instruction {
-    let mut data = vec![4u8, 0, side as u8, 1];
-    data.extend_from_slice(&price.to_le_bytes());
-    data.extend_from_slice(&size.to_le_bytes());
-    data.push(0); // DecrementTake
-    data.extend_from_slice(&match_limit.to_le_bytes());
-    trade_ix(market, trader, data)
+    let packet = clob_engine::OrderPacket::Limit {
+        side,
+        price_in_ticks: Ticks(price),
+        num_base_lots: BaseLots(size),
+        self_trade_behavior: clob_engine::SelfTradeBehavior::DecrementTake,
+        match_limit,
+    };
+    sdk::place_order(&bare_addresses(market), &trader, &packet, Receipt::Off)
 }
 
-/// Encodes a `PlaceOrder` for a post-only order that rejects on cross.
+/// A post-only order that rejects on cross.
 pub fn post_only_ix(
     market: Pubkey,
     trader: Pubkey,
@@ -195,14 +202,16 @@ pub fn post_only_ix(
     price: u64,
     size: u64,
 ) -> Instruction {
-    let mut data = vec![4u8, 1, side as u8, 1];
-    data.extend_from_slice(&price.to_le_bytes());
-    data.extend_from_slice(&size.to_le_bytes());
-    data.push(0); // Reject
-    trade_ix(market, trader, data)
+    let packet = sdk::post_only(
+        side,
+        Ticks(price),
+        BaseLots(size),
+        clob_engine::PostOnlyRejection::Reject,
+    );
+    sdk::place_order(&bare_addresses(market), &trader, &packet, Receipt::Off)
 }
 
-/// Encodes a `PlaceOrder` for an unpriced market order.
+/// An unpriced market order.
 pub fn market_order_ix(
     market: Pubkey,
     trader: Pubkey,
@@ -210,33 +219,23 @@ pub fn market_order_ix(
     size: u64,
     match_limit: u32,
 ) -> Instruction {
-    let mut data = vec![4u8, 2, side as u8, 0];
-    data.extend_from_slice(&0u64.to_le_bytes());
-    data.extend_from_slice(&size.to_le_bytes());
-    data.extend_from_slice(&0u64.to_le_bytes()); // no minimum fill
-    data.push(0); // DecrementTake
-    data.extend_from_slice(&match_limit.to_le_bytes());
-    trade_ix(market, trader, data)
+    let packet = sdk::market_order(side, BaseLots(size), match_limit);
+    sdk::place_order(&bare_addresses(market), &trader, &packet, Receipt::Off)
 }
 
-/// Encodes a `CancelOrder`.
+/// A cancel.
 pub fn cancel_ix(market: Pubkey, trader: Pubkey, id: FIFOOrderId) -> Instruction {
-    let mut data = vec![5u8];
-    data.extend_from_slice(&id.price_in_ticks.as_u64().to_le_bytes());
-    data.extend_from_slice(&id.order_sequence_number.to_le_bytes());
-    trade_ix(market, trader, data)
+    sdk::cancel_order(&bare_addresses(market), &trader, &id)
 }
 
-/// Encodes a `CancelAllOrders`.
+/// A bounded cancel-all.
 pub fn cancel_all_ix(market: Pubkey, trader: Pubkey, side: Side, limit: u32) -> Instruction {
-    let mut data = vec![7u8, side as u8];
-    data.extend_from_slice(&limit.to_le_bytes());
-    trade_ix(market, trader, data)
+    sdk::cancel_all_orders(&bare_addresses(market), &trader, side, limit)
 }
 
-/// Encodes a `ClaimSeat`.
+/// A seat claim.
 pub fn claim_seat_ix(market: Pubkey, trader: Pubkey) -> Instruction {
-    trade_ix(market, trader, vec![1u8])
+    sdk::claim_seat(&bare_addresses(market), &trader)
 }
 
 /// Convenience: the id of the caller's most recently placed order on `side`.
