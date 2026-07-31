@@ -26,6 +26,7 @@
 #![warn(missing_docs)]
 
 pub mod error;
+pub mod event;
 pub mod instruction;
 pub mod processor;
 pub mod state;
