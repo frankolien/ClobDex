@@ -1,3 +1,11 @@
 /target
 **/*.rs.bk
 .DS_Store
+
+# Endpoint credentials. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Markets created by clob-cli, including mint keypairs.
+.clob/
