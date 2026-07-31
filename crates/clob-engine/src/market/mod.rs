@@ -2,6 +2,7 @@
 
 mod funds;
 mod header;
+mod matching;
 
 use bytemuck::{Pod, Zeroable};
 use clob_book::{BaseLots, FIFOOrderId, Invariant, LotConfig, OrderBook, QuoteLots, Side};
