@@ -20,4 +20,4 @@ pub mod rpc;
 
 pub use config::Config;
 pub use record::{MarketRecord, TraderRecord};
-pub use rpc::Client;
+pub use rpc::{Client, Simulation};

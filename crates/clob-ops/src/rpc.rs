@@ -14,6 +14,14 @@ use solana_transaction::Transaction;
 
 use crate::config::Config;
 
+/// What a validator did with a transaction it did not keep.
+pub struct Simulation {
+    /// Compute consumed, if the endpoint reported it.
+    pub compute_units: Option<u64>,
+    /// Why it failed, if it did.
+    pub error: Option<String>,
+}
+
 /// A connected cluster.
 pub struct Client {
     rpc: RpcClient,
@@ -69,6 +77,43 @@ impl Client {
             .send_and_confirm_transaction(&transaction)
             .context("transaction failed")?;
         Ok(signature.to_string())
+    }
+
+    /// Runs instructions on the validator without sending them, reporting the compute
+    /// they consumed.
+    ///
+    /// The only way to measure a program you did not build: it needs no signature that
+    /// spends anything and no cooperation from the venue, so the same procedure works
+    /// against any market on the cluster. Which is the point — a compute number is worth
+    /// something only if the same method can be pointed at whatever you are comparing to.
+    ///
+    /// The transaction is signed anyway. Simulation does not require it, and a signed one
+    /// is the same transaction that would land, so nothing is being measured that could
+    /// not be sent.
+    pub fn simulate(&self, instructions: &[Instruction]) -> Result<Simulation> {
+        let blockhash = self
+            .rpc
+            .get_latest_blockhash()
+            .context("cannot reach the RPC endpoint")?;
+        let transaction = Transaction::new_signed_with_payer(
+            instructions,
+            Some(&self.payer.pubkey()),
+            &[&self.payer],
+            blockhash,
+        );
+
+        let response = self
+            .rpc
+            .simulate_transaction(&transaction)
+            .context("the endpoint refused to simulate")?;
+
+        Ok(Simulation {
+            compute_units: response.value.units_consumed,
+            // An instruction that reverts still reports the compute it burned before
+            // reverting, which is a different number from the one being measured. Keeping
+            // the error means a failed sample is reported as failed rather than as cheap.
+            error: response.value.err.map(|error| error.to_string()),
+        })
     }
 
     /// Reads an account's data, or `None` if it does not exist.

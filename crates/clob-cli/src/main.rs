@@ -96,6 +96,8 @@ enum Command {
         #[arg(long, default_value_t = 64)]
         limit: u32,
     },
+    /// Measure what each instruction costs, on the validator.
+    Bench,
     /// Print the signer and its SOL balance.
     Balance,
 }
@@ -156,6 +158,7 @@ fn main() -> Result<()> {
         Command::CancelAll { side, limit } => {
             commands::trade::cancel_all(&client, cluster, side.into(), limit)
         }
+        Command::Bench => commands::bench::run(&client, cluster, as_trader),
         Command::Balance => {
             println!("signer  {}", client.payer_key());
             println!("balance {:.4} SOL", client.balance()? as f64 / 1e9);
