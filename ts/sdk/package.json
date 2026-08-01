@@ -1,0 +1,23 @@
+{
+  "name": "@clobdex/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the ClobDex spot market: instruction builders, account decoding, and lot math.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": ["src", "dist"],
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

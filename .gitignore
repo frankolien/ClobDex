@@ -11,3 +11,7 @@ target/
 
 # Markets created by clob-cli, including mint keypairs.
 .clob/
+
+# Node dependencies and build output.
+node_modules/
+ts/**/dist/

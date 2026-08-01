@@ -693,6 +693,7 @@ dependencies = [
  "clob-engine",
  "clob-program",
  "proptest",
+ "serde_json",
  "solana-instruction",
  "solana-pubkey 4.2.0",
  "solana-system-interface",
