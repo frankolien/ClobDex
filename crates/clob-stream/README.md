@@ -4,11 +4,61 @@ Streams ClobDex markets from a Yellowstone endpoint and serves the derived tape.
 
 ```
 cargo run -p clob-stream          # reads .env
-curl localhost:8080/v1/markets
+curl localhost:8080/v1/markets                                  # every market, summarised
 curl localhost:8080/v1/markets/<market>/book?depth=10
 curl localhost:8080/v1/markets/<market>/trades
+curl localhost:8080/v1/markets/<market>/window?slots=216000     # volume, range, change
+curl localhost:8080/v1/markets/<market>/traders/<wallet>        # balances, open orders
 websocat ws://localhost:8080/v1/markets/<market>/stream
 ```
+
+## Money is a string, coordinates are numbers
+
+Every price, size, value and order identity here is a `u64`. JSON has one numeric type —
+an IEEE-754 double — which cannot hold consecutive integers above 2^53, so those fields
+cross as decimal strings.
+
+Not a precaution. A bid's stored sequence number is the complement of the arrival counter,
+which is what makes one ascending comparison price-time priority on both sides, so it sits
+just below `u64::MAX`. The sixth bid ever placed has the identity `18446744073709551610`,
+and `JSON.parse` returns `…616`. A client that cancelled with the number it was handed
+would cancel nothing and be told nothing.
+
+Slots, seat indices, counts and basis points stay numbers. All are bounded far below 2^53
+— slots by roughly a hundred million years of block production — and they are what you
+pass back as query parameters, where quoting buys nothing.
+
+An absent price is `null`, never `"0"`. A market with no liquidity has no price, and a
+quoted zero parses into a real one.
+
+## What a UI reads
+
+`/v1/markets` returns each market summarised — price, spread, midpoint, depth per side,
+what the market holds, the fee, the mints, and the lot geometry needed to format any of
+it. Everything comes from memory, so it costs no queries and can be polled.
+
+Rolling volume is deliberately not on it. `/window?slots=N` gives open, high, low, close,
+change, VWAP and totals over the last N slots, and costs a store query — folding that into
+the list would make the cheapest call the most expensive one. `slots` defaults to 216,000,
+about 24 hours at 400ms; that default is the only wall-clock assumption in the crate, and
+it selects which trades are counted rather than changing what any of them says. A span
+holding more trades than one query may read reports `truncated`, because an under-reported
+total is indistinguishable from a real one.
+
+`/traders/<wallet>` is the dashboard: seat, free and locked balances on both sides, and
+every resting order. Free and locked are separate because a wallet that deposited and then
+quoted still owns all of it while only part can be withdrawn — one combined number matches
+neither the vault nor the wallet's arithmetic. `404` when the wallet holds no seat, which
+is a different answer from a row of zeroes.
+
+Each open order carries two sequence numbers. `order_sequence_number` is what `CancelOrder`
+takes; `sequence_number` is the decoded arrival order, which is what the tape records and
+so the field to join a fill against. They are equal on asks and complements on bids, so a
+client given only the decoded one works perfectly until it cancels a bid.
+
+Fills name both sides where they can. `taker_seat` is `null` when several takers crossed
+the same side in one transaction: a diff sees liquidity leave, not which of them took it,
+and naming the first would file one trader's fill under another's.
 
 ## The endpoint is the only untestable part
 
@@ -121,6 +171,13 @@ version stays as the reference to test it against.
 The ClickHouse store is **unverified against a live server** — no ClickHouse was
 reachable when it was written. Its row encoding, parsing and error handling are tested;
 its SQL and connection handling are not. `Memory` is fully tested.
+
+That gap has already cost something. `Store::trades` is documented to keep the most recent
+rows when a limit bites, which `Memory` did and ClickHouse did not: it ran `ORDER BY slot
+ASC LIMIT n` and kept the oldest, so the same call returned the last hundred trades on one
+backend and the first hundred ever on the other. Both return `n` rows in ascending order,
+so it reads as a quiet market rather than an error. Fixed, and the trait now states which
+end a limit takes — but it was found by reading, and only a live server proves the fix.
 
 History older than the endpoint's replay window. A market's past is only as deep as
 whatever this process has seen plus whatever the endpoint can still replay; reaching
