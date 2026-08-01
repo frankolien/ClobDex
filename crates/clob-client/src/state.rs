@@ -32,6 +32,13 @@ pub enum DecodeError {
         /// Bytes the buffer actually holds.
         found: usize,
     },
+    /// The lot geometry is not one any market could have been created with.
+    ///
+    /// A `LotConfig` is `Pod`, so casting it out of account bytes bypasses
+    /// [`LotConfig::new`] and its checks entirely. A zero in the wrong field divides by
+    /// zero the first time anything is priced, which is a panic in whatever decoded it —
+    /// so the config is re-checked here rather than trusted.
+    InvalidLotConfig(clob_book::LotConfigError),
 }
 
 impl core::fmt::Display for DecodeError {
@@ -43,6 +50,9 @@ impl core::fmt::Display for DecodeError {
                 write!(f, "market version {found}, expected {expected}")
             }
             Self::UnknownSizeClass(value) => write!(f, "unknown size class {value}"),
+            Self::InvalidLotConfig(error) => {
+                write!(f, "the market's lot configuration is invalid: {error:?}")
+            }
             Self::Truncated { expected, found } => {
                 write!(f, "account is {found} bytes, expected {expected}")
             }
@@ -164,6 +174,14 @@ impl MarketState {
             SizeClass::Medium => decode_sized!(body, 512, 512, 128),
             SizeClass::Large => decode_sized!(body, 2048, 2048, 512),
         };
+
+        // A Pod cast bypasses LotConfig::new, so nothing has checked these numbers.
+        // Refusing here means anything that survives decoding is safe to price; the
+        // alternative is a divide by zero in whatever reads it next.
+        header
+            .lot_config
+            .validate()
+            .map_err(DecodeError::InvalidLotConfig)?;
 
         Ok(Self {
             account,
