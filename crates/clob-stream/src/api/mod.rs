@@ -33,6 +33,7 @@ pub async fn serve(
             .service(http::history)
             .service(http::candles)
             .service(http::window)
+            .service(http::trader)
             .route("/v1/markets/{market}/stream", web::get().to(ws::stream))
     })
     .bind(bind)?

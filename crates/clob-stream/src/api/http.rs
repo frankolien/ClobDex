@@ -13,7 +13,7 @@ use clob_book::Side;
 use solana_pubkey::Pubkey;
 
 use crate::api::view::{
-    Book, Candle, Health, HistoricalTrade, MarketSummary, Trade, Window, levels_of,
+    Book, Candle, Health, HistoricalTrade, MarketSummary, Trade, TraderView, Window, levels_of,
 };
 use crate::candle;
 use crate::registry::Registry;
@@ -211,6 +211,38 @@ pub async fn history(
         // A store that is down is a 503, not a 200 with an empty list — the difference
         // between "nothing traded" and "we cannot tell" matters to whoever is asking.
         Err(error) => HttpResponse::ServiceUnavailable().body(format!("{error:#}")),
+    }
+}
+
+/// One trader's balances and resting orders in one market.
+///
+/// Served here rather than left to a client because reaching it means walking the market
+/// account's seat table and both order trees. Those are red-black trees in a `Pod` arena;
+/// a second implementation of that walk in another language is a second thing that can be
+/// wrong about who owns what.
+///
+/// 404 when the wallet holds no seat, which is a different answer from a row of zeroes: a
+/// wallet that never traded here has no position, and one that withdrew everything has an
+/// empty one.
+#[get("/v1/markets/{market}/traders/{trader}")]
+pub async fn trader(
+    registry: web::Data<Registry>,
+    path: web::Path<(String, String)>,
+) -> impl Responder {
+    let (market, trader) = path.into_inner();
+    let Ok(market) = market.parse::<Pubkey>() else {
+        return HttpResponse::BadRequest().body("not a pubkey");
+    };
+    let Ok(trader) = trader.parse::<Pubkey>() else {
+        return HttpResponse::BadRequest().body("not a pubkey");
+    };
+    let Some(view) = registry.market(&market) else {
+        return HttpResponse::NotFound().body("market not tracked");
+    };
+
+    match TraderView::new(&market, &trader, &view) {
+        Some(position) => HttpResponse::Ok().json(position),
+        None => HttpResponse::NotFound().body("no seat in this market"),
     }
 }
 

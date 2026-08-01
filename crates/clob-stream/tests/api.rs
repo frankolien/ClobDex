@@ -12,7 +12,7 @@ use clob_engine::{FeeSchedule, Market, OrderPacket, PostOnlyRejection, TraderKey
 use clob_program::state::{
     HEADER_LEN, MARKET_DISCRIMINATOR, MARKET_VERSION, MarketAccountHeader, SizeClass,
 };
-use clob_stream::api::view::{MarketSummary, Window};
+use clob_stream::api::view::{MarketSummary, TraderView, Window};
 use clob_stream::candle;
 use clob_stream::registry::Registry;
 use clob_stream::store::StoredTrade;
@@ -168,6 +168,120 @@ fn a_one_sided_book_reports_the_side_it_has_and_no_spread() {
     assert_eq!(summary.best_ask_in_ticks, None);
     assert_eq!(summary.spread_in_ticks, None);
     assert_eq!(summary.mid_price_in_ticks, None);
+}
+
+/// The wallet behind a fixture seat. `Fixture::seat` claims with `TraderKey([id; 32])`.
+fn wallet(id: u8) -> Pubkey {
+    Pubkey::new_from_array([id; 32])
+}
+
+fn position(registry: &Registry, trader: &Pubkey) -> Option<TraderView> {
+    let view = registry.market(&MARKET).expect("the fixture seeds MARKET");
+    TraderView::new(&MARKET, trader, &view)
+}
+
+#[test]
+fn a_position_separates_what_is_free_from_what_is_committed() {
+    // The distinction a dashboard exists to show. A wallet that deposited and then quoted
+    // still owns everything it deposited; only some of it can be withdrawn or respent,
+    // and a balance reported as one number matches neither the vault nor the wallet.
+    let mut fixture = Fixture::new();
+    let mine = fixture.seat(1, 5_000, 9_000_000);
+    fixture.rest(mine, Side::Ask, 102, 700);
+    fixture.rest(mine, Side::Bid, 98, 10);
+
+    let position = position(&seeded(&fixture, 7), &wallet(1)).expect("seat 1 holds a seat");
+
+    assert_eq!(position.seat, mine);
+    assert_eq!(position.trader, wallet(1).to_string());
+    assert_eq!(position.slot, 7);
+
+    // 700 base lots are behind the resting ask, the rest is free.
+    assert_eq!(position.base_lots_locked, 700);
+    assert_eq!(position.base_lots_free, 5_000 - 700);
+
+    // The bid commits quote: 10 base lots at 98 ticks.
+    assert_eq!(position.quote_lots_locked, 980);
+    assert_eq!(position.quote_lots_free, 9_000_000 - 980);
+}
+
+#[test]
+fn a_position_lists_only_its_own_orders() {
+    // Orders name a seat, and every seat's orders sit in the same two trees. Filtering on
+    // the wrong field would show one trader another's book and offer to cancel it.
+    let mut fixture = Fixture::new();
+    let mine = fixture.seat(1, 5_000, 9_000_000);
+    let theirs = fixture.seat(2, 5_000, 9_000_000);
+    fixture.rest(mine, Side::Bid, 98, 10);
+    fixture.rest(theirs, Side::Bid, 97, 11);
+    fixture.rest(theirs, Side::Ask, 103, 12);
+    fixture.rest(mine, Side::Ask, 102, 13);
+
+    let registry = seeded(&fixture, 1);
+    let mine = position(&registry, &wallet(1)).unwrap();
+    let theirs = position(&registry, &wallet(2)).unwrap();
+
+    assert_eq!(mine.orders.len(), 2);
+    assert_eq!(theirs.orders.len(), 2);
+
+    let sizes: Vec<u64> = mine.orders.iter().map(|o| o.base_lots).collect();
+    assert_eq!(sizes, vec![10, 13], "the bid then the ask");
+    assert_eq!(mine.orders[0].side, "bid");
+    assert_eq!(mine.orders[0].price_in_ticks, 98);
+    assert_eq!(mine.orders[1].side, "ask");
+    assert_eq!(mine.orders[1].price_in_ticks, 102);
+}
+
+#[test]
+fn a_bid_carries_both_the_id_to_cancel_with_and_the_one_to_join_on() {
+    // Bids store the complement of the arrival counter, so one ascending comparison gives
+    // price-time priority on both sides. A client that had only the decoded number would
+    // work perfectly until it cancelled a bid, and then cancel nothing.
+    let mut fixture = Fixture::new();
+    let mine = fixture.seat(1, 5_000, 9_000_000);
+    fixture.rest(mine, Side::Bid, 98, 10);
+    fixture.rest(mine, Side::Ask, 102, 10);
+
+    let position = position(&seeded(&fixture, 1), &wallet(1)).unwrap();
+    let bid = &position.orders[0];
+    let ask = &position.orders[1];
+
+    assert_eq!(bid.side, "bid");
+    assert_eq!(
+        bid.order_sequence_number,
+        !bid.sequence_number,
+        "a bid stores the complement"
+    );
+    assert_eq!(ask.side, "ask");
+    assert_eq!(
+        ask.order_sequence_number, ask.sequence_number,
+        "an ask stores the counter as it is"
+    );
+}
+
+#[test]
+fn a_wallet_with_no_seat_has_no_position_rather_than_an_empty_one() {
+    // "You have never traded here" and "you are set up and flat" are different answers,
+    // and only one of them means a dashboard should offer to claim a seat.
+    let mut fixture = Fixture::new();
+    fixture.seat(1, 5_000, 9_000_000);
+
+    let registry = seeded(&fixture, 1);
+    assert!(position(&registry, &wallet(1)).is_some());
+    assert!(position(&registry, &wallet(99)).is_none());
+}
+
+#[test]
+fn a_seat_that_withdrew_everything_still_has_a_position() {
+    let mut fixture = Fixture::new();
+    fixture.seat(1, 0, 0);
+
+    let position = position(&seeded(&fixture, 1), &wallet(1)).expect("a claimed seat");
+    assert_eq!(position.base_lots_free, 0);
+    assert_eq!(position.base_lots_locked, 0);
+    assert_eq!(position.quote_lots_free, 0);
+    assert_eq!(position.quote_lots_locked, 0);
+    assert!(position.orders.is_empty());
 }
 
 /// A stored fill, for the window projections.

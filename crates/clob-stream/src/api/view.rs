@@ -280,6 +280,108 @@ impl Window {
     }
 }
 
+/// One of a trader's resting orders.
+#[derive(Serialize)]
+pub struct OpenOrder {
+    /// Which side it rests on.
+    pub side: &'static str,
+    /// Limit price.
+    pub price_in_ticks: u64,
+    /// The identity `CancelOrder` takes, together with the price.
+    ///
+    /// Side-encoded — bids store the complement of the counter so one ascending
+    /// comparison gives price-time priority on both sides — so this is *not* the arrival
+    /// order and must not be compared against one. It is the value to send back.
+    pub order_sequence_number: u64,
+    /// Arrival order, decoded.
+    ///
+    /// What the tape records as `maker_order_sequence`, so this is the field to join a
+    /// fill against. Carried alongside the encoded one rather than instead of it because
+    /// the two are equal on asks and complements on bids: a client that had only one
+    /// would work perfectly until someone cancelled a bid.
+    pub sequence_number: u64,
+    /// Size still resting.
+    pub base_lots: u64,
+}
+
+/// A trader's position in one market.
+///
+/// The seat is the market's own index for a wallet. Balances are held by the market, not
+/// by the wallet: `free` can be withdrawn or committed to a new order, `locked` is
+/// already committed to something resting. A dashboard showing only one of the two
+/// reports a balance that does not match the wallet's own arithmetic.
+#[derive(Serialize)]
+pub struct TraderView {
+    /// The market.
+    pub market: String,
+    /// The wallet.
+    pub trader: String,
+    /// The market's index for this wallet. Resting orders and tape entries name it.
+    pub seat: u32,
+    /// Slot this state came from.
+    pub slot: u64,
+    /// Everything at or below this slot is rooted.
+    pub finalized_through: u64,
+    /// Base lots available to withdraw or commit.
+    pub base_lots_free: u64,
+    /// Base lots committed to resting asks.
+    pub base_lots_locked: u64,
+    /// Quote lots available to withdraw or commit.
+    pub quote_lots_free: u64,
+    /// Quote lots committed to resting bids.
+    pub quote_lots_locked: u64,
+    /// Everything this trader has resting, best price first on each side.
+    pub orders: Vec<OpenOrder>,
+}
+
+impl TraderView {
+    /// A trader's balances and resting orders, or `None` if it holds no seat here.
+    ///
+    /// No seat is a different answer from an empty one: a wallet that never traded this
+    /// market has no row, while one that withdrew everything has a row of zeroes. A
+    /// dashboard needs to tell "you are not set up here" from "you are, and you are flat".
+    pub fn new(
+        market: &solana_pubkey::Pubkey,
+        trader: &solana_pubkey::Pubkey,
+        view: &crate::registry::MarketView,
+    ) -> Option<Self> {
+        let state = &view.state;
+        let key = clob_engine::TraderKey(trader.to_bytes());
+        let seat = state.seat_of(&key)?;
+        let balances = state.trader(&key)?;
+
+        let orders = [Side::Bid, Side::Ask]
+            .into_iter()
+            .flat_map(|side| {
+                state
+                    .side(side)
+                    .iter()
+                    .filter(move |order| order.trader_index == seat)
+                    .map(move |order| OpenOrder {
+                        side: side_name(side),
+                        price_in_ticks: order.price_in_ticks().as_u64(),
+                        order_sequence_number: order.id.order_sequence_number,
+                        sequence_number: order.id.sequence_number(),
+                        base_lots: order.num_base_lots.as_u64(),
+                    })
+            })
+            .collect();
+
+        Some(Self {
+            market: market.to_string(),
+            trader: trader.to_string(),
+            seat,
+            slot: view.slot,
+            finalized_through: view.finalized_through,
+            base_lots_free: balances.base_lots_free.as_u64(),
+            base_lots_locked: balances.base_lots_locked.as_u64(),
+            quote_lots_free: balances.quote_lots_free.as_u64(),
+            quote_lots_locked: balances.quote_lots_locked.as_u64(),
+            orders,
+        })
+    }
+}
+
 /// Liveness, and whether the derivation still agrees with the chain.
 #[derive(Serialize)]
 pub struct Health {
