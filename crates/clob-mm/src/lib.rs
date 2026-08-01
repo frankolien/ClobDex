@@ -16,5 +16,6 @@ pub mod fair;
 pub mod inventory;
 pub mod ladder;
 pub mod params;
+pub mod plan;
 
 pub use params::{Params, ParamsError};
