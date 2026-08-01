@@ -16,6 +16,12 @@ publish = false
 clob-book = { path = "../clob-book" }
 clob-client = { path = "../clob-client" }
 clob-engine = { path = "../clob-engine" }
+clob-ops = { path = "../clob-ops" }
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+ctrlc = "3"
+solana-pubkey = "4"
 
 [dev-dependencies]
 bytemuck = { version = "1.23", default-features = false }
