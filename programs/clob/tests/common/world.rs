@@ -389,4 +389,46 @@ impl World {
     pub fn starting_totals(&self) -> (u64, u64) {
         (self.base_atoms_at_start, self.quote_atoms_at_start)
     }
+
+    // -----------------------------------------------------------------------------
+    // Faults, for proving the checks are live
+    //
+    // An invariant that has never been observed failing is indistinguishable from one
+    // that is not being evaluated, and this whole harness is worth nothing if its checks
+    // are vacuous. These break one rule each, without going through the program, so each
+    // check can be shown rejecting exactly what it claims to catch.
+    // -----------------------------------------------------------------------------
+
+    /// Moves base atoms out of the vault into a trader's wallet behind the market's back.
+    ///
+    /// Breaks solvency alone: no token was created, so the totals still balance and only
+    /// the vault check can see it.
+    pub fn embezzle_base(&mut self, trader: usize, atoms: u64) {
+        let vault = self.fixture.base_vault;
+        let wallet = self.traders[trader].base;
+        let (vault_held, wallet_held) = (
+            token_balance(&self.accounts[&vault]),
+            token_balance(&self.accounts[&wallet]),
+        );
+        set_token_balance(self.accounts.get_mut(&vault).expect("the vault"), vault_held - atoms);
+        set_token_balance(
+            self.accounts.get_mut(&wallet).expect("the wallet"),
+            wallet_held + atoms,
+        );
+    }
+
+    /// Creates base atoms in a trader's wallet from nothing.
+    ///
+    /// Breaks the supply alone: the vault still holds what the market owes, so only the
+    /// totals check can see it.
+    pub fn counterfeit_base(&mut self, trader: usize, atoms: u64) {
+        let wallet = self.traders[trader].base;
+        let held = token_balance(&self.accounts[&wallet]);
+        set_token_balance(self.accounts.get_mut(&wallet).expect("the wallet"), held + atoms);
+    }
+}
+
+/// Writes the amount field of an SPL token account, at the offset `token_balance` reads.
+fn set_token_balance(account: &mut Account, amount: u64) {
+    account.data[64..72].copy_from_slice(&amount.to_le_bytes());
 }

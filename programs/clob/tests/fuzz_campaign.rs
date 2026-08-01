@@ -513,3 +513,34 @@ fn the_campaign_reaches_states_worth_testing() {
         "the book never got deeper than {deepest} orders — nothing exercised a wind-down at depth"
     );
 }
+
+/// The checks have to be capable of failing.
+///
+/// Everything above has passed on every run this campaign has ever done, which is the
+/// result a vacuous check produces too. So each invariant is shown a world it is supposed
+/// to reject, built by breaking one rule behind the program's back.
+///
+/// The two faults are chosen to be visible to exactly one check each. A fault both could
+/// catch would leave either one free to be broken.
+#[test]
+fn the_invariants_can_actually_fail() {
+    // Solvency. Atoms leave the vault for a wallet without the market's accounting
+    // changing: nothing was created, so the totals still balance and only the vault
+    // check is in a position to notice.
+    let mut world = World::new(TRADERS, TAKER_FEE_BPS);
+    bootstrap(&mut world);
+    assert_eq!(world.check(), Ok(()), "the fault has not been injected yet");
+
+    world.embezzle_base(0, 1);
+    let error = world.check().expect_err("a vault one atom short must be reported");
+    assert!(error.contains("base vault"), "wrong check fired: {error}");
+
+    // Supply. Atoms appear in a wallet from nowhere: the vault still holds exactly what
+    // the market owes, so only the totals check can see it.
+    let mut world = World::new(TRADERS, TAKER_FEE_BPS);
+    bootstrap(&mut world);
+
+    world.counterfeit_base(1, 1);
+    let error = world.check().expect_err("an invented atom must be reported");
+    assert!(error.contains("base atoms went from"), "wrong check fired: {error}");
+}
