@@ -20,3 +20,4 @@ clob-engine = { path = "../clob-engine" }
 [dev-dependencies]
 bytemuck = { version = "1.23", default-features = false }
 clob-program = { path = "../../programs/clob" }
+proptest = "1.11"
