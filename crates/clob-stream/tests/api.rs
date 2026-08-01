@@ -284,6 +284,87 @@ fn a_seat_that_withdrew_everything_still_has_a_position() {
     assert!(position.orders.is_empty());
 }
 
+#[test]
+fn an_order_identity_crosses_the_wire_as_a_string() {
+    // The reason quantities are not JSON numbers. A bid's stored sequence number is the
+    // complement of the arrival counter, so it sits just below u64::MAX — far above the
+    // 2^53 where a double stops holding consecutive integers.
+    let mut fixture = Fixture::new();
+    let mine = fixture.seat(1, 5_000, 9_000_000);
+    fixture.rest(mine, Side::Bid, 98, 10);
+
+    let position = position(&seeded(&fixture, 1), &wallet(1)).unwrap();
+    let exact = position.orders[0].order_sequence_number;
+    assert!(exact > 1 << 53, "a bid identity is near u64::MAX, got {exact}");
+
+    // What a JSON number would have done to it. Compared in i128 rather than by casting
+    // back to u64: a u64 -> f64 -> u64 round trip saturates at the top of the range and
+    // lands back on the same value, hiding the loss that a JSON parser does not hide.
+    assert_ne!(
+        i128::from(exact),
+        exact as f64 as i128,
+        "the nearest double to an order identity must not be that identity"
+    );
+
+    let json = serde_json::to_value(&position).unwrap();
+    let encoded = json["orders"][0]["order_sequence_number"]
+        .as_str()
+        .expect("an identity must be a string");
+    assert_eq!(encoded, exact.to_string());
+    assert_eq!(encoded.parse::<u64>().unwrap(), exact);
+}
+
+#[test]
+fn money_is_a_string_and_coordinates_are_numbers() {
+    // Quoting a slot or a seat would buy no precision — both are bounded far below 2^53 —
+    // and would put a conversion at every call site that passes one back as a query
+    // parameter.
+    let mut fixture = Fixture::new();
+    let mine = fixture.seat(1, 5_000, 9_000_000);
+    fixture.rest(mine, Side::Bid, 98, 10);
+
+    let position = serde_json::to_value(position(&seeded(&fixture, 7), &wallet(1)).unwrap()).unwrap();
+    assert!(position["base_lots_free"].is_string());
+    assert!(position["quote_lots_locked"].is_string());
+    assert!(position["orders"][0]["price_in_ticks"].is_string());
+    assert!(position["slot"].is_number(), "a slot is a coordinate");
+    assert!(position["seat"].is_number(), "a seat index is a coordinate");
+
+    let summary = serde_json::to_value(summary(&seeded(&fixture, 7))).unwrap();
+    assert!(summary["best_bid_in_ticks"].is_string());
+    assert!(summary["base_lots_deposited"].is_string());
+    assert!(summary["lots"]["base_atoms_per_base_lot"].is_string());
+    assert!(summary["taker_fee_bps"].is_number(), "bps is bounded by 10,000");
+    assert!(summary["bid_orders"].is_number(), "a count is a tally");
+    assert!(summary["trades_seen"].is_number(), "a count is a tally");
+}
+
+#[test]
+fn an_absent_price_stays_null_rather_than_becoming_a_quoted_zero() {
+    // A quoted "0" would parse to a real price of zero, which is the failure the optional
+    // types exist to prevent — now with an extra step for it to hide behind.
+    let fixture = Fixture::new();
+    let summary = serde_json::to_value(summary(&seeded(&fixture, 1))).unwrap();
+
+    assert!(summary["best_bid_in_ticks"].is_null());
+    assert!(summary["spread_in_ticks"].is_null());
+    assert!(summary["last_price_in_ticks"].is_null());
+
+    let window = serde_json::to_value(Window::new(&MARKET, 1, 100, &[], false)).unwrap();
+    assert!(window["open_in_ticks"].is_null());
+    assert!(window["change_in_ticks"].is_null());
+    assert!(window["base_lots"].is_string(), "a total of nothing is still money");
+    assert_eq!(window["base_lots"], "0");
+}
+
+#[test]
+fn a_negative_change_keeps_its_sign_as_a_string() {
+    let trades = [stored(10, 120, 1), stored(20, 80, 1)];
+    let window = serde_json::to_value(Window::new(&MARKET, 1, 20, &trades, false)).unwrap();
+
+    assert_eq!(window["change_in_ticks"], "-40");
+}
+
 /// A stored fill, for the window projections.
 fn stored(slot: u64, price: u64, size: u64) -> StoredTrade {
     StoredTrade {

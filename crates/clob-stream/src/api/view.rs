@@ -8,16 +8,77 @@
 //! `Ticks` and `BaseLots`, which are exact and meaningful in-process; on the wire they
 //! are plain integers with the unit in the field name, so a consumer cannot mistake a
 //! tick for a price or a lot for a token.
+//!
+//! # Quantities and identities are strings
+//!
+//! Every price, size, value and order identity here is a `u64`, and JSON has one numeric
+//! type: an IEEE-754 double, which cannot hold consecutive integers above 2^53. The
+//! largest of these is not hypothetical. A bid's stored sequence number is the complement
+//! of the arrival counter — that is what makes one ascending comparison price-time
+//! priority on both sides — so the sixth bid ever placed has the identity
+//! 18446744073709551610, and `JSON.parse` reads it as ...616. A client that cancelled
+//! with the number it was given would cancel nothing, and be told nothing.
+//!
+//! So those fields cross as decimal strings. Slots, seat indices, counts and basis points
+//! stay numbers: they are bounded well below 2^53 — slots by roughly a hundred million
+//! years of block production — and they are what callers put in query parameters, where a
+//! quoted number is a nuisance for no benefit.
+//!
+//! The rule, then: **if it is money or an identity, it is a string; if it is a coordinate
+//! or a tally, it is a number.**
 
 use clob_book::Side;
 use serde::Serialize;
+
+/// Renders a `u64` as a decimal string. See the module docs.
+mod big {
+    use serde::Serializer;
+
+    pub fn serialize<S: Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(value)
+    }
+
+    /// The same, for a value that may be absent. `None` stays `null` rather than becoming
+    /// `"null"` or zero.
+    pub mod maybe {
+        use serde::Serializer;
+
+        pub fn serialize<S: Serializer>(
+            value: &Option<u64>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
+            match value {
+                Some(value) => serializer.collect_str(value),
+                None => serializer.serialize_none(),
+            }
+        }
+    }
+
+    /// The same, for a signed change. Rendered as a string for the same reason and so a
+    /// client parses every quantity the same way, not because an `i64` needs it.
+    pub mod signed {
+        use serde::Serializer;
+
+        pub fn serialize<S: Serializer>(
+            value: &Option<i64>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
+            match value {
+                Some(value) => serializer.collect_str(value),
+                None => serializer.serialize_none(),
+            }
+        }
+    }
+}
 
 /// One aggregated price level.
 #[derive(Serialize)]
 pub struct Level {
     /// Price, in ticks.
+    #[serde(serialize_with = "big::serialize")]
     pub price_in_ticks: u64,
     /// Size resting there, in base lots.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
 }
 
@@ -54,10 +115,13 @@ pub struct Trade {
     /// Slot it landed in.
     pub slot: u64,
     /// Execution price — always the maker's.
+    #[serde(serialize_with = "big::serialize")]
     pub price_in_ticks: u64,
     /// Size, in base lots.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
     /// Gross quote value, before fee.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots: u64,
     /// Side the taker was on.
     pub taker_side: &'static str,
@@ -96,12 +160,16 @@ impl Trade {
 #[derive(Serialize)]
 pub struct Lots {
     /// Base lots per whole base unit.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots_per_base_unit: u64,
     /// One tick, in quote lots per base unit.
+    #[serde(serialize_with = "big::serialize")]
     pub tick_size_in_quote_lots_per_base_unit: u64,
     /// Base-token atoms per base lot.
+    #[serde(serialize_with = "big::serialize")]
     pub base_atoms_per_base_lot: u64,
     /// Quote-token atoms per quote lot.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_atoms_per_quote_lot: u64,
 }
 
@@ -143,26 +211,33 @@ pub struct MarketSummary {
     /// Tick and lot geometry.
     pub lots: Lots,
     /// Best bid, if the side has liquidity.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub best_bid_in_ticks: Option<u64>,
     /// Best ask, if the side has liquidity.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub best_ask_in_ticks: Option<u64>,
     /// Ask minus bid, when both sides have liquidity.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub spread_in_ticks: Option<u64>,
     /// Midpoint, when both sides have liquidity.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub mid_price_in_ticks: Option<u64>,
     /// Price of the most recent trade this process has seen, if it has seen one.
     ///
     /// From the in-memory tape, so it is empty after a restart until something trades —
     /// unlike the book, which is restored from a checkpoint. A client that needs a last
     /// price across restarts should read it from the history endpoint.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub last_price_in_ticks: Option<u64>,
     /// Resting orders on the bid.
     pub bid_orders: usize,
     /// Resting orders on the ask.
     pub ask_orders: usize,
     /// Base lots the market holds for all seats.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots_deposited: u64,
     /// Quote lots the market holds for all seats, including unclaimed fees.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots_deposited: u64,
     /// Seats claimed.
     pub seats: usize,
@@ -218,20 +293,28 @@ pub struct Window {
     /// Slots the span covers.
     pub slots: u64,
     /// Price of the first trade in the span.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub open_in_ticks: Option<u64>,
     /// Highest price traded.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub high_in_ticks: Option<u64>,
     /// Lowest price traded.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub low_in_ticks: Option<u64>,
     /// Price of the last trade in the span.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub close_in_ticks: Option<u64>,
     /// Close minus open. Signed, because a market can fall.
+    #[serde(serialize_with = "big::signed::serialize")]
     pub change_in_ticks: Option<i64>,
     /// Volume-weighted average price.
+    #[serde(serialize_with = "big::maybe::serialize")]
     pub vwap_in_ticks: Option<u64>,
     /// Total size traded, in base lots.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
     /// Total gross value traded, in quote lots.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots: u64,
     /// How many fills went into it.
     pub trades: u64,
@@ -286,12 +369,14 @@ pub struct OpenOrder {
     /// Which side it rests on.
     pub side: &'static str,
     /// Limit price.
+    #[serde(serialize_with = "big::serialize")]
     pub price_in_ticks: u64,
     /// The identity `CancelOrder` takes, together with the price.
     ///
     /// Side-encoded — bids store the complement of the counter so one ascending
     /// comparison gives price-time priority on both sides — so this is *not* the arrival
     /// order and must not be compared against one. It is the value to send back.
+    #[serde(serialize_with = "big::serialize")]
     pub order_sequence_number: u64,
     /// Arrival order, decoded.
     ///
@@ -299,8 +384,10 @@ pub struct OpenOrder {
     /// fill against. Carried alongside the encoded one rather than instead of it because
     /// the two are equal on asks and complements on bids: a client that had only one
     /// would work perfectly until someone cancelled a bid.
+    #[serde(serialize_with = "big::serialize")]
     pub sequence_number: u64,
     /// Size still resting.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
 }
 
@@ -323,12 +410,16 @@ pub struct TraderView {
     /// Everything at or below this slot is rooted.
     pub finalized_through: u64,
     /// Base lots available to withdraw or commit.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots_free: u64,
     /// Base lots committed to resting asks.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots_locked: u64,
     /// Quote lots available to withdraw or commit.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots_free: u64,
     /// Quote lots committed to resting bids.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots_locked: u64,
     /// Everything this trader has resting, best price first on each side.
     pub orders: Vec<OpenOrder>,
@@ -426,8 +517,10 @@ pub enum Message {
         /// Trades it produced.
         trades: Vec<Trade>,
         /// Best bid after it, if the side has liquidity.
+        #[serde(serialize_with = "big::maybe::serialize")]
         best_bid: Option<u64>,
         /// Best ask after it, if the side has liquidity.
+        #[serde(serialize_with = "big::maybe::serialize")]
         best_ask: Option<u64>,
         /// Everything at or below this slot is rooted. Anything above it can still be
         /// retracted, which is what a consumer needs in order to decide whether to act.
@@ -459,16 +552,22 @@ pub struct Candle {
     /// First slot in the bucket. Buckets are `[start_slot, start_slot + interval)`.
     pub start_slot: u64,
     /// Price of the first trade in the bucket.
+    #[serde(serialize_with = "big::serialize")]
     pub open: u64,
     /// Highest price traded.
+    #[serde(serialize_with = "big::serialize")]
     pub high: u64,
     /// Lowest price traded.
+    #[serde(serialize_with = "big::serialize")]
     pub low: u64,
     /// Price of the last trade in the bucket.
+    #[serde(serialize_with = "big::serialize")]
     pub close: u64,
     /// Total size, in base lots.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
     /// Total gross value, in quote lots.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots: u64,
     /// How many trades went into it.
     pub trades: u64,
@@ -500,10 +599,13 @@ pub struct HistoricalTrade {
     /// The transaction, hex-encoded.
     pub signature: String,
     /// Execution price — always the maker's.
+    #[serde(serialize_with = "big::serialize")]
     pub price_in_ticks: u64,
     /// Size, in base lots.
+    #[serde(serialize_with = "big::serialize")]
     pub base_lots: u64,
     /// Gross quote value, before fee.
+    #[serde(serialize_with = "big::serialize")]
     pub quote_lots: u64,
     /// Side the taker was on.
     pub taker_side: &'static str,
