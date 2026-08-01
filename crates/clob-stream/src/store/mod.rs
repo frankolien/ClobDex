@@ -18,11 +18,13 @@
 //! same split as [`Source`](crate::source::Source), for the same reason.
 
 pub mod clickhouse;
+pub mod file;
 pub mod memory;
 
 use anyhow::Result;
 use solana_pubkey::Pubkey;
 
+pub use file::Files;
 pub use memory::Memory;
 
 /// One trade, as stored.
