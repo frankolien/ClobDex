@@ -19,8 +19,10 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
 <section class="band" id="book">
   <div class="shell grid">
     <div class="copy">
-      <p class="eyebrow reveal">The interface</p>
-      <h2 class="reveal" style="--delay:60ms">Price, time, and nothing in between.</h2>
+      <p class="tag reveal">The interface</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        Price, Time,<br /><span class="dim">And Nothing In Between</span>
+      </h2>
       <p class="lede reveal" style="--delay:120ms">
         Orders rest in a red-black tree keyed by price and arrival, so the first order at
         the best price is the first one filled — on both sides, from one comparison. No
@@ -116,7 +118,7 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
     top: 0.6em;
     width: 6px;
     height: 1px;
-    background: var(--data);
+    background: var(--green);
   }
 
   .points b {
@@ -133,7 +135,7 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
   .panel {
     display: grid;
     gap: 1px;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-2);
     border-radius: var(--radius);
     background: var(--line);
     overflow: hidden;
@@ -168,7 +170,7 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
      fake without saying so would be the one dishonest thing on it. */
   .tag {
     padding: 0.2rem 0.55rem;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-2);
     border-radius: 999px;
     font-family: var(--mono);
     font-size: 0.625rem;
@@ -214,11 +216,11 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
   }
 
   .asks .bar {
-    background: linear-gradient(90deg, rgb(224 138 106 / 0.16), rgb(224 138 106 / 0.02));
+    background: linear-gradient(90deg, rgb(239 125 99 / 0.16), rgb(239 125 99 / 0.02));
   }
 
   .bids .bar {
-    background: linear-gradient(90deg, rgb(143 212 255 / 0.16), rgb(143 212 255 / 0.02));
+    background: linear-gradient(90deg, rgb(74 222 155 / 0.16), rgb(74 222 155 / 0.02));
   }
 
   .p,
@@ -227,19 +229,19 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
   }
 
   .asks .p {
-    color: #e08a6a;
+    color: var(--ask);
   }
 
   .bids .p {
-    color: var(--ice);
+    color: var(--bid);
   }
 
   .s {
     color: var(--text-2);
   }
 
-  /* Cool below, warm above — the same night-to-dawn axis the page runs on, rather than the
-     usual green and red, which would fight the palette and steal the accent from data. */
+  /* Green bids, red asks — the convention every trader reading a ladder expects. A venue
+     is the wrong place to be inventive about which colour means somebody is buying. */
   .spread {
     display: flex;
     align-items: baseline;
@@ -255,11 +257,11 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
   }
 
   .mid.up {
-    color: var(--ice);
+    color: var(--bid);
   }
 
   .mid.down {
-    color: #e08a6a;
+    color: var(--ask);
   }
 
   .sp {
@@ -286,11 +288,11 @@ const rows = Array.from({ length: DEPTH }, (_, index) => index);
   }
 
   .tape li.buy span:first-child {
-    color: var(--ice);
+    color: var(--bid);
   }
 
   .tape li.sell span:first-child {
-    color: #e08a6a;
+    color: var(--ask);
   }
 
   @keyframes print {

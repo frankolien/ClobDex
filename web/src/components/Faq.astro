@@ -1,0 +1,113 @@
+---
+/**
+ * Native `<details>`, not a JavaScript accordion.
+ *
+ * It opens without script, it is keyboard operable and announced correctly for free, and
+ * the browser's find-in-page can reach inside a closed one. An accordion built from
+ * buttons and divs gets none of that and costs code.
+ */
+const questions = [
+  {
+    q: "Where do my tokens actually sit?",
+    a: "In the market's own vaults, controlled by a program-derived address that no person holds the key to. You deposit once, trade against your balance, and withdraw whatever is not committed to a resting order. There is no custodian and no withdrawal queue — a withdrawal is an instruction like any other.",
+  },
+  {
+    q: "What happens if the indexer goes down?",
+    a: "Trading is unaffected. The indexer reads the chain; it does not stand between you and the program. A UI would lose its charts and its tape, and anyone could still post, cancel and fill by sending instructions directly. That is the difference between an off-chain convenience and an off-chain dependency — Serum's crank was the second kind.",
+  },
+  {
+    q: "Is there a token?",
+    a: "No, and none is planned. There is a per-market taker fee that whoever created the market sets and collects; the protocol itself takes nothing.",
+  },
+  {
+    q: "Has it been audited?",
+    a: "No. That is the gating item before any mainnet deployment and it is not scheduled yet. What exists instead is 501 tests, a conserve-funds fuzzing campaign that runs arbitrary instruction sequences through the compiled binary and asserts both internal consistency and vault solvency, and published compute benchmarks with their method. None of that is a substitute for an audit.",
+  },
+  {
+    q: "Can I run a market maker against it?",
+    a: "There is one in the repository — inventory skew, post-only ladders that are proven not to cross, and a replace policy that does not thrash on every tick. It is a working bot rather than an example, and it is the same code used to produce the batching numbers.",
+  },
+  {
+    q: "How do I verify the compute figures?",
+    a: "Run them. `cargo test -p clob-program --test compute -- --nocapture` executes the compiled binary under Mollusk and prints what a validator would charge. The second instrument simulates against a live market, needs no signature that spends anything, and can therefore be pointed at any program on the chain — including whichever one you want to compare against.",
+  },
+];
+---
+
+<section class="band" id="faq">
+  <div class="shell">
+    <div class="band-head">
+      <p class="tag reveal">Questions</p>
+      <h2 class="display reveal" style="--delay:60ms">Frequently Asked Questions</h2>
+    </div>
+
+    <div class="list reveal">
+      {
+        questions.map((item) => (
+          <details>
+            <summary>
+              <span>{item.q}</span>
+              <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                <path d="M3.5 5.5L7 9L10.5 5.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </summary>
+            <p>{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: var(--ink-1);
+  }
+
+  .list {
+    max-width: 46rem;
+    margin-inline: auto;
+    border-top: 1px solid var(--line);
+  }
+
+  details {
+    border-bottom: 1px solid var(--line);
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.35rem 0.25rem;
+    font-size: 1rem;
+    cursor: pointer;
+    list-style: none;
+    transition: color 0.2s var(--ease);
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:hover {
+    color: var(--green);
+  }
+
+  summary svg {
+    flex: none;
+    color: var(--text-3);
+    transition: rotate 0.25s var(--ease);
+  }
+
+  details[open] summary svg {
+    rotate: 180deg;
+  }
+
+  details p {
+    padding: 0 3rem 1.5rem 0.25rem;
+    color: var(--text-2);
+    font-size: 0.9375rem;
+    line-height: 1.65;
+  }
+</style>

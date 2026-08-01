@@ -1,0 +1,207 @@
+---
+/**
+ * The hero's atmosphere.
+ *
+ * The reference uses a photograph of cloud at dusk. This is the same image built out of
+ * gradients: soft drifting masses over a deep blue, with stars in the upper dark where a
+ * real dusk sky would have them. Nothing to download, correct at any aspect ratio, and it
+ * paints on the first frame instead of after a two-megabyte image.
+ *
+ * Calm on purpose. The previous hero moved because moving was the brief; this one holds
+ * still enough to read a serif headline over, which is the brief now.
+ */
+---
+
+<div class="sky" aria-hidden="true">
+  <canvas id="atmosphere"></canvas>
+  <div class="haze"></div>
+</div>
+
+<style>
+  .sky {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: linear-gradient(
+      180deg,
+      #060c14 0%,
+      var(--sky-1) 22%,
+      var(--sky-2) 60%,
+      #21384d 100%
+    );
+  }
+
+  #atmosphere {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Darkens the top under the fixed navigation and fades the bottom into the page, so the
+     hero ends rather than stops. */
+  .haze {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgb(5 6 7 / 0.65) 0%, rgb(5 6 7 / 0) 18%),
+      radial-gradient(75% 55% at 50% 42%, rgb(5 6 7 / 0.5) 0%, rgb(5 6 7 / 0) 72%),
+      linear-gradient(180deg, rgb(5 6 7 / 0) 72%, var(--ink) 100%);
+  }
+</style>
+
+<script>
+  import { ease, pointerTarget } from "../scripts/pointer.ts";
+
+  type Cloud = { x: number; y: number; rx: number; ry: number; a: number; drift: number };
+  type Star = { x: number; y: number; r: number; a: number; phase: number };
+
+  const CLOUDS = 14;
+  const STARS = 130;
+
+  /** How far the two layers lean towards the pointer, as a fraction of the canvas. */
+  const LEAN_STARS = 0.012;
+  const LEAN_CLOUDS = 0.03;
+
+  const canvas = document.getElementById("atmosphere") as HTMLCanvasElement | null;
+  const context = canvas?.getContext("2d", { alpha: true }) ?? null;
+
+  if (canvas && context) {
+    let seed = 0x1b873593;
+    const random = () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return ((seed >>> 0) % 100000) / 100000;
+    };
+
+    const clouds: Cloud[] = Array.from({ length: CLOUDS }, () => {
+      const y = 0.32 + random() * 0.75;
+      return {
+        x: random() * 1.3 - 0.15,
+        y,
+        rx: 0.18 + random() * 0.34,
+        ry: 0.05 + random() * 0.11,
+        // Lower cloud is brighter: the light in this sky comes from below the horizon.
+        a: 0.04 + y * 0.11 + random() * 0.05,
+        drift: 0.004 + random() * 0.011,
+      };
+    });
+
+    // Stars only in the upper third, and fading out before the cloud starts. A star seen
+    // through the bright part of a dusk sky is a star nobody would see.
+    const stars: Star[] = Array.from({ length: STARS }, () => {
+      const y = random() * 0.42;
+      return {
+        x: random(),
+        y,
+        r: 0.35 + random() * 0.9,
+        a: (0.2 + random() * 0.55) * (1 - y / 0.45),
+        phase: random() * Math.PI * 2,
+      };
+    });
+
+    let width = 0;
+    let height = 0;
+    const lean = { x: 0, y: 0 };
+
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const box = canvas.getBoundingClientRect();
+      width = box.width;
+      height = box.height;
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    };
+
+    const draw = (seconds: number) => {
+      const pointer = pointerTarget();
+      // Slow easing. This is weather, and weather does not track a cursor.
+      lean.x = ease(lean.x, pointer.x, 0.025);
+      lean.y = ease(lean.y, pointer.y, 0.025);
+
+      context.clearRect(0, 0, width, height);
+
+      for (const star of stars) {
+        const twinkle = 0.75 + Math.sin(seconds * 0.7 + star.phase) * 0.25;
+        context.beginPath();
+        context.arc(
+          star.x * width + lean.x * LEAN_STARS * width,
+          star.y * height + lean.y * LEAN_STARS * height,
+          star.r,
+          0,
+          Math.PI * 2,
+        );
+        context.fillStyle = `rgba(228, 238, 248, ${star.a * twinkle})`;
+        context.fill();
+      }
+
+      for (const cloud of clouds) {
+        // Wrapped drift, so a mass leaving one edge arrives at the other rather than
+        // thinning the sky out over a few minutes.
+        const x = ((cloud.x + seconds * cloud.drift) % 1.4) - 0.2;
+        const cx = x * width + lean.x * LEAN_CLOUDS * width;
+        const cy = cloud.y * height + lean.y * LEAN_CLOUDS * height * 0.4;
+        const rx = cloud.rx * width;
+        const ry = cloud.ry * height;
+
+        const glow = context.createRadialGradient(cx, cy, 0, cx, cy, rx);
+        glow.addColorStop(0, `rgba(150, 190, 225, ${cloud.a})`);
+        glow.addColorStop(0.55, `rgba(110, 150, 190, ${cloud.a * 0.45})`);
+        glow.addColorStop(1, "rgba(90, 130, 170, 0)");
+
+        context.save();
+        context.translate(cx, cy);
+        context.scale(1, ry / rx);
+        context.translate(-cx, -cy);
+        context.fillStyle = glow;
+        context.fillRect(cx - rx, cy - rx, rx * 2, rx * 2);
+        context.restore();
+      }
+    };
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    let running = false;
+
+    const loop = (timestamp: number) => {
+      draw(timestamp / 1000);
+      frame = requestAnimationFrame(loop);
+    };
+
+    const start = () => {
+      if (running || reduced.matches) return;
+      running = true;
+      frame = requestAnimationFrame(loop);
+    };
+
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frame);
+    };
+
+    const visible = new IntersectionObserver(
+      ([entry]) => (entry?.isIntersecting ? start() : stop()),
+      { threshold: 0 },
+    );
+    visible.observe(canvas);
+
+    document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+
+    const settle = () => {
+      resize();
+      if (reduced.matches) {
+        stop();
+        draw(0);
+      } else {
+        start();
+      }
+    };
+
+    reduced.addEventListener("change", settle);
+    window.addEventListener("resize", settle, { passive: true });
+    settle();
+  }
+</script>

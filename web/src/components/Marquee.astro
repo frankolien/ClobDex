@@ -1,0 +1,137 @@
+---
+/**
+ * The reference's scrolling pill rows, which show the assets you can trade.
+ *
+ * The equivalent here is the instruction set: thirteen of them, which is the whole surface
+ * area of the program. It fills the same slot and tells a developer something a list of
+ * ticker logos would not.
+ *
+ * Two rows moving opposite ways, because one row moving alone reads as a broken carousel.
+ */
+const instructions = [
+  { name: "PlaceOrder", note: "Limit · PostOnly · IOC · FOK" },
+  { name: "BatchUpdate", note: "Cancel and place, one instruction" },
+  { name: "CancelOrder", note: "By id" },
+  { name: "CancelAllOrders", note: "One side or both" },
+  { name: "CancelUpTo", note: "Bounded by price" },
+  { name: "ReduceOrder", note: "Shrink without losing priority" },
+  { name: "Swap", note: "No seat required" },
+  { name: "Deposit", note: "Into the market's vaults" },
+  { name: "Withdraw", note: "Free funds only" },
+  { name: "ClaimSeat", note: "Permissionless" },
+  { name: "CollectFees", note: "To the fee recipient" },
+  { name: "InitializeMarket", note: "Anyone, any pair" },
+  { name: "SetFeeRecipient", note: "Authority only" },
+];
+
+// Duplicated so the strip can translate exactly half its width and land where it started,
+// which is what makes the loop seamless without measuring anything at runtime.
+const doubled = [...instructions, ...instructions];
+const top = doubled.slice(0, 14);
+const bottom = doubled.slice(6, 20);
+---
+
+<section class="band tight">
+  <div class="band-head">
+    <p class="tag reveal">The surface</p>
+    <h2 class="display reveal" style="--delay:60ms">
+      Thirteen instructions.<br /><span class="dim">Every one benchmarked.</span>
+    </h2>
+  </div>
+
+  <div class="rails">
+    <div class="rail">
+      <div class="strip">
+        {top.map((item) => (
+          <span class="pill"><b>{item.name}</b><em>{item.note}</em></span>
+        ))}
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="strip back">
+        {bottom.map((item) => (
+          <span class="pill"><b>{item.name}</b><em>{item.note}</em></span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tight {
+    padding-block: clamp(4rem, 8vw, 6.5rem);
+    background: var(--ink);
+    overflow: hidden;
+  }
+
+  .rails {
+    display: grid;
+    gap: 0.85rem;
+    /* Faded at both edges so the strips leave the page rather than being cut off by it. */
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  }
+
+  .rail {
+    overflow: hidden;
+  }
+
+  .strip {
+    display: flex;
+    gap: 0.85rem;
+    width: max-content;
+    animation: slide 46s linear infinite;
+  }
+
+  .strip.back {
+    animation-direction: reverse;
+    animation-duration: 58s;
+  }
+
+  /* Pausing on hover makes the row readable, which is the only reason it moves in the
+     first place — an unreadable list of instruction names is just texture. */
+  .rails:hover .strip {
+    animation-play-state: paused;
+  }
+
+  @keyframes slide {
+    to {
+      translate: -50% 0;
+    }
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.6rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    white-space: nowrap;
+  }
+
+  .pill b {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .pill em {
+    font-style: normal;
+    font-size: 0.78125rem;
+    color: var(--text-3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .strip {
+      animation: none;
+    }
+
+    /* Not moving, so it must be scrollable by hand rather than simply truncated. */
+    .rail {
+      overflow-x: auto;
+    }
+  }
+</style>

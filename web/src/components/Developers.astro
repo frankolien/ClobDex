@@ -1,0 +1,194 @@
+---
+import { links } from "../site.ts";
+
+/**
+ * The reference's green developer band: a code sample, floating cards either side, a link
+ * to the docs. Kept almost exactly, because it is the section where this project has the
+ * most to show — the SDK is real, the sample below compiles, and the drift guarantee it
+ * describes is enforced by tests in both languages.
+ */
+---
+
+<section class="band green" id="developers">
+  <div class="shell">
+    <div class="band-head">
+      <p class="tag reveal"><span class="lit">●</span> Zero runtime dependencies</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        Built To Be Integrated<br /><span class="dim">Not Just Deployed</span>
+      </h2>
+      <p class="lede reveal" style="--delay:120ms">
+        Typed instruction builders in Rust and TypeScript, an indexer that serves REST and
+        WebSocket, and a reference market maker you can read. An integrator should need an
+        afternoon, not a support channel.
+      </p>
+      <a class="btn btn-line reveal" style="--delay:180ms" href={links.sdk} rel="noopener">
+        View the SDK
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <path d="M4 12L12 4M12 4H6M12 4v6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
+    </div>
+
+    <div class="stage">
+      <aside class="float left reveal" style="--delay:80ms">
+        <p class="ft">One byte layout</p>
+        <p class="fb">
+          Rust writes every instruction to <code>spec/wire-vectors.json</code>. TypeScript
+          asserts it reproduces them. Neither side can move without the other going red.
+        </p>
+      </aside>
+
+      <figure class="code reveal" style="--delay:140ms">
+        <figcaption>
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="file">quote.ts</span>
+        </figcaption>
+        <pre><code><span class="k">import</span> &#123; placeOrder, postOnly, Side &#125; <span class="k">from</span> <span class="s">"@clobdex/sdk"</span>;
+
+<span class="c">// Rest 25 base lots on the bid at 150.000, and refuse to cross.</span>
+<span class="k">const</span> instruction = <span class="f">placeOrder</span>(
+  addresses,
+  trader,
+  <span class="f">postOnly</span>(Side.Bid, <span class="n">150_000n</span>, <span class="n">25n</span>),
+);
+
+<span class="c">// Plain data: a program, an account list, and bytes.</span>
+<span class="c">// Send it with whichever client you already use.</span></code></pre>
+      </figure>
+
+      <aside class="float right reveal" style="--delay:200ms">
+        <p class="ft">Every quantity is a <code>bigint</code></p>
+        <p class="fb">
+          A price in ticks is a <code>u64</code>. Above 2<sup>53</sup> a JavaScript number
+          stops holding consecutive integers, and a size that rounds is a size that does not
+          match what was signed.
+        </p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* The one place the page goes green, matching the reference's developer band. */
+  .green {
+    background:
+      radial-gradient(70% 60% at 50% 55%, rgb(26 122 86 / 0.22) 0%, rgb(5 6 7 / 0) 70%),
+      linear-gradient(180deg, var(--ink-1) 0%, #061310 45%, var(--ink-1) 100%);
+  }
+
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .code {
+    margin: 0;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    background: #0a0f0e;
+    overflow: hidden;
+    box-shadow: 0 30px 70px -35px rgb(0 0 0 / 0.9);
+  }
+
+  figcaption {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dots {
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+
+  .dots i {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--text-4);
+  }
+
+  .file {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-3);
+  }
+
+  pre {
+    margin: 0;
+    padding: 1.1rem 1.25rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    color: #d7dcda;
+  }
+
+  .k {
+    color: #c792ea;
+  }
+  .s {
+    color: var(--green);
+  }
+  .c {
+    color: var(--text-4);
+  }
+  .f {
+    color: #82aaff;
+  }
+  .n {
+    color: #f78c6c;
+  }
+
+  .float {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgb(16 19 20 / 0.75);
+    backdrop-filter: blur(10px);
+  }
+
+  .left {
+    translate: 0 -2.5rem;
+  }
+
+  .right {
+    translate: 0 2.5rem;
+  }
+
+  .ft {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.35rem;
+  }
+
+  .fb {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--text-3);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+  }
+
+  .fb code {
+    color: var(--text-2);
+  }
+
+  @media (max-width: 960px) {
+    .stage {
+      grid-template-columns: 1fr;
+    }
+
+    .left,
+    .right {
+      translate: none;
+    }
+  }
+</style>

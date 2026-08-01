@@ -30,8 +30,10 @@ const notYet = [
 <section class="band" id="status">
   <div class="shell">
     <div class="band-head">
-      <p class="eyebrow reveal">Where this actually is</p>
-      <h2 class="reveal" style="--delay:60ms">Unaudited, on {status.cluster.toLowerCase()}.</h2>
+      <p class="tag reveal">Where this actually is</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        Unaudited.<br /><span class="dim">On {status.cluster.toLowerCase()}.</span>
+      </h2>
       <p class="lede reveal" style="--delay:120ms">
         Everything above is real and reproducible from the repository. None of it is a
         substitute for an audit, and this is not somewhere to put money you need back.
@@ -58,7 +60,7 @@ const notYet = [
 
 <style>
   .band {
-    background: linear-gradient(180deg, var(--dawn-2) 0%, var(--dawn-3) 100%);
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--green-mid) 100%);
   }
 
   .columns {
@@ -69,7 +71,7 @@ const notYet = [
 
   .col {
     padding: 1.75rem;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-2);
     border-radius: var(--radius);
     background: rgb(4 5 10 / 0.42);
     backdrop-filter: blur(10px);
@@ -95,7 +97,7 @@ const notYet = [
 
   .tick {
     background: rgb(200 247 81 / 0.16);
-    color: var(--data);
+    color: var(--green);
   }
 
   .cross {
@@ -126,7 +128,7 @@ const notYet = [
     top: 0.62em;
     width: 5px;
     height: 1px;
-    background: var(--data);
+    background: var(--green);
   }
 
   .pending li::before {

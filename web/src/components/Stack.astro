@@ -32,8 +32,10 @@ const pieces = [
 <section class="band" id="stack">
   <div class="shell">
     <div class="band-head">
-      <p class="eyebrow reveal">What is actually built</p>
-      <h2 class="reveal" style="--delay:60ms">The half most venues leave to someone else.</h2>
+      <p class="tag reveal">What is actually built</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        The Half Most Venues<br /><span class="dim">Leave To Someone Else</span>
+      </h2>
       <p class="lede reveal" style="--delay:120ms">
         A program on its own is not a venue. Somebody still has to index it, serve its data,
         quote into it and integrate it. All of that is here and open.
@@ -57,7 +59,7 @@ const pieces = [
 
 <style>
   .band {
-    background: linear-gradient(180deg, var(--dawn-1) 0%, var(--dawn-2) 100%);
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--ink-2) 100%);
   }
 
   .cards {
@@ -83,7 +85,7 @@ const pieces = [
 
   .card:hover {
     translate: 0 -3px;
-    border-color: var(--line-strong);
+    border-color: var(--line-2);
     background: rgb(4 5 10 / 0.5);
   }
 
@@ -91,7 +93,7 @@ const pieces = [
     font-size: 0.6875rem;
     letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: var(--data);
+    color: var(--green);
   }
 
   .card h3 {

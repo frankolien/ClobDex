@@ -1,0 +1,95 @@
+---
+import { links } from "../site.ts";
+
+/**
+ * The reference's closing band: full-bleed green, a serif headline in two tones, one
+ * button. Its curved graphic is an image; this one is built from two large radial
+ * gradients meeting in the middle, which is the same shape and nothing to download.
+ */
+---
+
+<section class="close">
+  <div class="shell inner">
+    <h2 class="display">
+      An Order Book<br /><span class="dim">You Can Verify</span>
+    </h2>
+    <p class="lede">
+      Every claim on this page is a file in a repository. Read the program, run the
+      benchmarks, and check the numbers against your own machine.
+    </p>
+    <div class="actions">
+      <a class="btn btn-dark" href={links.app}>Launch app</a>
+      <a class="btn btn-clear" href={links.github} rel="noopener">Read the source</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .close {
+    position: relative;
+    padding-block: clamp(6rem, 12vw, 10rem);
+    overflow: hidden;
+    text-align: center;
+    background: var(--green-deep);
+  }
+
+  /* Two lobes meeting at the centre, echoing the sweep in the reference's closing panel.
+     Pointer-events off so they cannot eat a click meant for the button. */
+  .close::before,
+  .close::after {
+    content: "";
+    position: absolute;
+    top: -25%;
+    width: 60%;
+    height: 150%;
+    pointer-events: none;
+    background: radial-gradient(
+      closest-side,
+      rgb(74 222 155 / 0.55) 0%,
+      rgb(74 222 155 / 0.12) 55%,
+      rgb(74 222 155 / 0) 100%
+    );
+  }
+
+  .close::before {
+    left: -18%;
+  }
+
+  .close::after {
+    right: -18%;
+  }
+
+  .inner {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 1.5rem;
+  }
+
+  .display .dim {
+    color: rgb(244 245 245 / 0.55);
+  }
+
+  .lede {
+    max-width: 44ch;
+    color: rgb(244 245 245 / 0.7);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+
+  .btn-clear {
+    border-color: rgb(244 245 245 / 0.3);
+    color: var(--text);
+  }
+
+  .btn-clear:hover {
+    border-color: rgb(244 245 245 / 0.6);
+    background: rgb(244 245 245 / 0.08);
+  }
+</style>

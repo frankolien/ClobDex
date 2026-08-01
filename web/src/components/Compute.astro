@@ -22,9 +22,9 @@ const budget = 1_400_000;
 <section class="band" id="compute">
   <div class="shell">
     <div class="band-head">
-      <p class="eyebrow reveal">Measured, not estimated</p>
-      <h2 class="reveal" style="--delay:60ms">
-        Compute is the constraint. Here is ours.
+      <p class="tag reveal">Measured, not estimated</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        Compute Is The Constraint.<br /><span class="dim">Here Is Ours.</span>
       </h2>
       <p class="lede reveal" style="--delay:120ms">
         Compute decides how deep a taker can sweep, how many quotes a maker can refresh at
@@ -95,7 +95,7 @@ const budget = 1_400_000;
 
 <style>
   .band {
-    background: linear-gradient(180deg, var(--ink-2) 0%, var(--dawn-1) 100%);
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--ink-2) 100%);
   }
 
   .grid {
@@ -143,7 +143,7 @@ const budget = 1_400_000;
 
   .cu {
     font-size: 1.05rem;
-    color: var(--data);
+    color: var(--green);
   }
 
   /* The bar grows as its row arrives, so the column reads as a comparison rather than as
@@ -196,7 +196,7 @@ const budget = 1_400_000;
     margin-top: 2.5rem;
     padding: 1.35rem 1.5rem;
     border: 1px solid var(--line);
-    border-left: 2px solid var(--dawn-3);
+    border-left: 2px solid var(--green-mid);
     border-radius: 0 var(--radius) var(--radius) 0;
     color: var(--text-2);
     font-size: 0.9rem;
@@ -211,7 +211,7 @@ const budget = 1_400_000;
   }
 
   .method a {
-    color: var(--dawn-4);
+    color: var(--green);
     white-space: nowrap;
   }
 

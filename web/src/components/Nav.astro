@@ -1,115 +1,213 @@
 ---
 import { links } from "../site.ts";
+
+/**
+ * Left mark, centre navigation, right actions — the enterprise arrangement the reference
+ * uses, rather than the floating centred pill it replaces. It reads as a company rather
+ * than as a launch page, which is the whole reason to switch.
+ */
+const groups = [
+  {
+    label: "Protocol",
+    items: [
+      { name: "How it settles", href: "#how" },
+      { name: "Market classes", href: "#classes" },
+      { name: "Compute", href: "#compute" },
+    ],
+  },
+  {
+    label: "Developers",
+    items: [
+      { name: "TypeScript SDK", href: links.sdk },
+      { name: "Indexer", href: links.indexer },
+      { name: "Benchmarks", href: links.benchmarks },
+    ],
+  },
+];
 ---
 
 <header class="bar">
-  <nav class="pill" aria-label="Primary">
-    <a class="item" href="#how">Protocol</a>
-    <a class="item" href="#compute">Compute</a>
-
-    <a class="mark" href="/" aria-label="ClobDex home">
-      <svg viewBox="0 0 32 32" width="18" height="18" aria-hidden="true">
-        <path d="M9 20h4v4H9zM9 14h4v4H9zM15 8h4v4h-4zM21 14h4v4h-4z" fill="currentColor"></path>
+  <div class="shell inner">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="var(--green)"></rect>
+        <path d="M6 15h3v3H6zM6 10h3v3H6zM10.5 6h3v3h-3zM15 10h3v3h-3z" fill="#050607"></path>
       </svg>
+      <span>ClobDex</span>
     </a>
 
-    <a class="item" href="#stack">Stack</a>
-    <a class="item" href={links.github} rel="noopener">GitHub</a>
-  </nav>
+    <nav class="menu" aria-label="Primary">
+      {
+        groups.map((group) => (
+          <div class="group">
+            <button type="button" aria-expanded="false">
+              {group.label}
+              <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" />
+              </svg>
+            </button>
+            <div class="drop">
+              {group.items.map((item) => (
+                <a href={item.href} rel="noopener">{item.name}</a>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+      <a class="plain" href="#status">Status</a>
+    </nav>
 
-  <!-- A different origin, not a route. The app is its own deploy, so this is the one
-       place the boundary between the two is crossed. -->
-  <a class="btn btn-primary launch" href={links.app}>
-    Launch app
-    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-      <path
-        d="M4 12L12 4M12 4H6M12 4v6"
-        stroke="currentColor"
-        stroke-width="1.6"
-        fill="none"
-        stroke-linecap="round"
-        stroke-linejoin="round"></path>
-    </svg>
-  </a>
+    <div class="actions">
+      <a class="plain" href={links.github} rel="noopener">GitHub</a>
+      <a class="btn btn-solid" href={links.app}>Launch app</a>
+    </div>
+  </div>
 </header>
 
 <style>
   .bar {
     position: fixed;
-    inset: 1rem 0 auto;
-    z-index: 50;
+    inset: 0 0 auto;
+    z-index: 60;
+    height: var(--nav-h);
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    padding-inline: 1.5rem;
-    pointer-events: none;
+    background: rgb(5 6 7 / 0.72);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    border-bottom: 1px solid var(--line);
   }
 
-  .bar > * {
+  .inner {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1rem;
+  }
+
+  .menu {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-right: auto;
+  }
+
+  .group {
+    position: relative;
+  }
+
+  .group button,
+  .plain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.7rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: color 0.18s var(--ease);
+  }
+
+  .group:hover button,
+  .group:focus-within button,
+  .plain:hover {
+    color: var(--text);
+  }
+
+  .group button svg {
+    transition: rotate 0.22s var(--ease);
+  }
+
+  .group:hover button svg,
+  .group:focus-within button svg {
+    rotate: 180deg;
+  }
+
+  /* Hover and focus, so the menus are reachable from a keyboard as well as a pointer.
+     A padding-top on the panel keeps the gap hoverable — otherwise the menu closes in
+     the space between the button and itself. */
+  .drop {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    padding-top: 0.6rem;
+    min-width: 13rem;
+    opacity: 0;
+    translate: 0 -6px;
+    pointer-events: none;
+    transition:
+      opacity 0.2s var(--ease),
+      translate 0.2s var(--ease);
+  }
+
+  .group:hover .drop,
+  .group:focus-within .drop {
+    opacity: 1;
+    translate: 0 0;
     pointer-events: auto;
   }
 
-  .pill,
-  .launch {
-    /* The glass the reference leans on. `saturate` matters more than the blur: it keeps
-       the colour of whatever is behind from going grey as it is blurred. */
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-  }
-
-  .pill {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.3rem;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: rgb(10 14 24 / 0.6);
-  }
-
-  .item {
-    padding: 0.5rem 0.95rem;
-    border-radius: 999px;
+  .drop a {
+    display: block;
+    padding: 0.55rem 0.85rem;
     font-size: 0.875rem;
     color: var(--text-2);
+    background: var(--card-2);
+    border-inline: 1px solid var(--line);
     transition:
-      color 0.2s var(--ease),
-      background-color 0.2s var(--ease);
+      color 0.18s var(--ease),
+      background-color 0.18s var(--ease);
   }
 
-  .item:hover {
+  .drop a:first-of-type {
+    border-top: 1px solid var(--line);
+    border-radius: 10px 10px 0 0;
+  }
+
+  .drop a:last-of-type {
+    border-bottom: 1px solid var(--line);
+    border-radius: 0 0 10px 10px;
+  }
+
+  .drop a:hover {
     color: var(--text);
-    background: rgb(255 255 255 / 0.06);
+    background: #1c2021;
   }
 
-  .mark {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    margin-inline: 0.15rem;
-    border-radius: 999px;
-    background: var(--data);
-    color: var(--ink);
-    transition: box-shadow 0.3s var(--ease);
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
-  .mark:hover {
-    box-shadow: 0 0 24px -4px var(--data);
+  .actions .btn {
+    padding: 0.5em 1.1em;
+    font-size: 0.875rem;
   }
 
-  .launch {
-    background: rgb(242 245 251 / 0.94);
-  }
-
-  @media (max-width: 720px) {
-    .item {
+  @media (max-width: 900px) {
+    .menu {
       display: none;
     }
 
-    .bar {
+    .inner {
       justify-content: space-between;
+    }
+
+    .actions .plain {
+      display: none;
     }
   }
 </style>

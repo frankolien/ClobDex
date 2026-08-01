@@ -1,51 +1,67 @@
 /*
- * The whole design system.
+ * The design system.
  *
- * One file, because it is small enough to hold in your head and because a token that
- * lives in two places is a token that will disagree with itself. Components style
- * themselves with these and add nothing global.
+ * Editorial rather than cinematic: a high-contrast serif for display, a plain grotesque
+ * for everything else, dark cards on near-black, and one emerald that carries the brand.
+ * The restraint is the point — the page should read like a prospectus, not a launch video.
  *
- * The page is a journey from night to dawn: near-black at the hero, deep blue through the
- * argument, warm light at the close. That gradient is the only decoration doing real work
- * — it tells you how far down you are without a progress bar.
+ * The headline treatment is the signature and it is worth stating: two lines, the first
+ * in full white and the second in grey. It does the work an image would otherwise do.
  */
 
 :root {
-  /* Night. The hero and the sections that carry the argument. */
-  --ink: #04050a;
-  --ink-1: #080b14;
-  --ink-2: #0d1220;
-  --ink-3: #141b2e;
+  --ink: #050607;
+  --ink-1: #090b0c;
+  --ink-2: #0e1112;
+  --card: #101314;
+  --card-2: #151819;
 
-  /* Dawn. The closing sections, where the page warms up. */
-  --dawn-1: #1a1f3a;
-  --dawn-2: #47456b;
-  --dawn-3: #b08a72;
-  --dawn-4: #e8c9a0;
+  /* Deep atmospheric blue for the hero. The template's hero is a photograph of cloud at
+     dusk; this is the same palette built from gradients so nothing has to be downloaded. */
+  --sky-1: #0a1420;
+  --sky-2: #14293d;
+  --sky-3: #24425c;
+  --sky-4: #4a6b85;
 
-  /* Ice, for glow and structure. Cool, because the hero is glass and light. */
-  --ice: #8fd4ff;
-  --ice-dim: #3d6b8f;
+  /* Emerald: the brand accent. Buttons, the closing band, liveness pips, the bid side. */
+  --green: #4ade9b;
 
-  /* Lime, for data only. Every number that was measured is this colour and nothing else
-     is, so the accent means "this is a fact" rather than "this is important". */
-  --data: #c8f751;
+  /*
+   * Book sides. Green for bids because green is already this palette's accent, and red for
+   * asks because every trader reading a ladder expects it — a venue is the wrong place to
+   * be inventive about which colour means someone is buying.
+   */
+  --bid: #4ade9b;
+  --ask: #ef7d63;
+  --green-deep: #0d3b2a;
+  --green-mid: #1a7a56;
 
-  --text: #f2f5fb;
-  --text-2: #a8b2c8;
-  --text-3: #6b7590;
+  --text: #f4f5f5;
+  --text-2: #a3a9ab;
+  --text-3: #6c7275;
+  --text-4: #474b4d;
 
-  --line: rgb(255 255 255 / 0.08);
-  --line-strong: rgb(255 255 255 / 0.16);
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.13);
 
-  --shell: min(1180px, 100% - 3rem);
-  --radius: 14px;
+  --shell: min(1240px, 100% - 3rem);
+  --radius: 12px;
+  --radius-lg: 18px;
 
+  /*
+   * `ui-serif` is New York on Apple platforms — a transitional serif close to what the
+   * reference uses, already on the machine, and nothing to download or self-host. The
+   * fallbacks are the best serif each platform actually ships. If this ever needs to be
+   * identical everywhere, that is the point at which a font gets self-hosted, and it will
+   * cost roughly thirty times the JavaScript on this page.
+   */
+  --serif: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Times New Roman", serif;
   --sans: "Inter var", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  /* One curve for everything that moves, so the page feels like one object. */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --nav-h: 68px;
 }
 
 *,
@@ -56,6 +72,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 1rem);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -64,21 +81,11 @@ body {
   background: var(--ink);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.6;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.008em;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-}
-
-h1,
-h2,
-h3 {
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.04;
-  text-wrap: balance;
 }
 
 p {
@@ -96,43 +103,69 @@ a {
   margin-inline: auto;
 }
 
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6em;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+/* --- Display type ------------------------------------------------------------- */
+
+/*
+ * The reference's whole identity. A serif at display size, tight, with the second line
+ * dropped to grey — which reads as a subtitle without needing to be one, and gives a
+ * two-line headline a shape.
+ */
+.display {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.display .dim {
   color: var(--text-3);
 }
 
-.eyebrow::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  rotate: 45deg;
-  background: var(--data);
+h1.display {
+  font-size: clamp(2.75rem, 7vw, 5.25rem);
+}
+
+h2.display {
+  font-size: clamp(2.1rem, 4.8vw, 3.5rem);
+}
+
+h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
 }
 
 .lede {
   color: var(--text-2);
-  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
-  line-height: 1.55;
+  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  line-height: 1.6;
   max-width: 58ch;
 }
 
-/* Numbers are tabular everywhere. A column of compute figures that shifts as digits
-   change is a column nobody can compare down. */
-.num {
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
   font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 
-.data {
-  color: var(--data);
+.tag .lit {
+  color: var(--green);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* --- Buttons ------------------------------------------------------------------ */
@@ -140,75 +173,82 @@ a {
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5em;
-  padding: 0.72em 1.3em;
+  justify-content: center;
+  gap: 0.45em;
+  padding: 0.7em 1.5em;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 0.9375rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 450;
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color 0.25s var(--ease),
-    border-color 0.25s var(--ease),
-    transform 0.25s var(--ease),
-    box-shadow 0.25s var(--ease);
+    background-color 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    color 0.2s var(--ease),
+    opacity 0.2s var(--ease);
 }
 
-.btn-primary {
-  background: var(--text);
-  color: var(--ink);
+.btn-solid {
+  background: #f4f5f5;
+  color: #050607;
 }
 
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 30px -10px rgb(143 212 255 / 0.5);
+.btn-solid:hover {
+  background: #fff;
 }
 
-.btn-ghost {
-  border-color: var(--line-strong);
+.btn-line {
+  border-color: var(--line-2);
   color: var(--text);
-  background: rgb(255 255 255 / 0.02);
+  background: rgb(255 255 255 / 0.03);
 }
 
-.btn-ghost:hover {
-  border-color: rgb(255 255 255 / 0.32);
-  background: rgb(255 255 255 / 0.06);
+.btn-line:hover {
+  border-color: rgb(255 255 255 / 0.3);
+  background: rgb(255 255 255 / 0.07);
 }
 
-/* --- Sections ----------------------------------------------------------------- */
+.btn-dark {
+  background: var(--ink);
+  color: var(--text);
+}
+
+/* --- Cards and sections ------------------------------------------------------- */
 
 .band {
   position: relative;
-  padding-block: clamp(6rem, 13vw, 11rem);
+  padding-block: clamp(5rem, 10vw, 8.5rem);
 }
 
 .band-head {
   display: grid;
-  gap: 1.25rem;
-  max-width: 44rem;
-  margin-bottom: clamp(3rem, 6vw, 4.5rem);
+  gap: 1.1rem;
+  justify-items: center;
+  text-align: center;
+  max-width: 46rem;
+  margin: 0 auto clamp(3rem, 6vw, 4.5rem);
 }
 
-.band-head h2 {
-  font-size: clamp(2rem, 4.6vw, 3.25rem);
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
 }
 
 /* --- Reveal ------------------------------------------------------------------- */
 
 /*
- * Progressive, not decorative. Everything is visible by default; the `.js` class is set
- * by an inline script before first paint, so a visitor without JavaScript reads the whole
- * page rather than a blank one — and a failure to observe leaves content shown, not
- * hidden. Motion is opt-out for anyone who asked the OS to reduce it.
+ * Everything is visible by default. The `.js` class is set inline before first paint, so
+ * a page without JavaScript reads normally and a failure to observe leaves content shown
+ * rather than hidden.
  */
 .js .reveal {
   opacity: 0;
-  translate: 0 22px;
+  translate: 0 16px;
   transition:
-    opacity 0.85s var(--ease),
-    translate 0.85s var(--ease);
+    opacity 0.7s var(--ease),
+    translate 0.7s var(--ease);
   transition-delay: var(--delay, 0ms);
 }
 

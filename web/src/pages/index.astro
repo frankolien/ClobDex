@@ -1,34 +1,31 @@
 ---
 import Base from "../layouts/Base.astro";
 import Hero from "../components/Hero.astro";
-import Statement from "../components/Statement.astro";
+import Marquee from "../components/Marquee.astro";
 import HowItWorks from "../components/HowItWorks.astro";
 import LiveBook from "../components/LiveBook.astro";
-import Cosmos from "../components/Cosmos.astro";
+import Classes from "../components/Classes.astro";
 import Compute from "../components/Compute.astro";
+import Developers from "../components/Developers.astro";
 import Stack from "../components/Stack.astro";
 import Status from "../components/Status.astro";
-import Cta from "../components/Cta.astro";
-
-const problem =
-  "An automated market maker quotes both sides of every price at once, forever, whether or not anyone wants them. It cannot cancel. So it is picked off every time the market moves, and its holders pay for that in returns they never see billed.";
+import Faq from "../components/Faq.astro";
+import Closing from "../components/Closing.astro";
 ---
 
 <Base
-  title="ClobDex — a crankless on-chain order book on Solana"
-  description="Post, cancel and fill in a single transaction. No crank, no oracle, no custody. A market maker refreshes an entire two-sided ladder for 4,639 compute units."
+  title="ClobDex — the onchain order book that settles in one go"
+  description="A crankless central limit order book on Solana. Post, cancel and fill in a single transaction, with no crank, no oracle and no custody. A market maker refreshes an entire two-sided ladder for 4,639 compute units."
 >
   <Hero />
-  <Statement
-    eyebrow="Why an order book"
-    text={problem}
-    emphasis={["cancel", "picked", "off"]}
-  />
+  <Marquee />
   <HowItWorks />
   <LiveBook />
-  <Cosmos />
+  <Classes />
   <Compute />
+  <Developers />
   <Stack />
   <Status />
-  <Cta />
+  <Faq />
+  <Closing />
 </Base>

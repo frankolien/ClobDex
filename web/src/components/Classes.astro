@@ -1,0 +1,204 @@
+---
+/**
+ * The reference's pricing grid: three cards, the middle one lit, a spec table in each.
+ *
+ * There is nothing to price here — the protocol charges a per-market taker fee its creator
+ * sets, and nothing else — so the slot holds the choice a market creator actually makes.
+ * The three size classes are the only irreversible decision at creation, and the numbers
+ * are the ones `programs/clob/tests/sizes.rs` asserts.
+ */
+const classes = [
+  {
+    name: "Small",
+    rent: "0.1352",
+    bytes: "19,296",
+    lit: false,
+    rows: [
+      ["Orders per side", "128"],
+      ["Seats", "32"],
+      ["Account size", "19,296 bytes"],
+      ["Rent, once", "0.1352 SOL"],
+      ["Best for", "A new pair"],
+    ],
+  },
+  {
+    name: "Medium",
+    rent: "0.5307",
+    bytes: "76,128",
+    lit: true,
+    rows: [
+      ["Orders per side", "512"],
+      ["Seats", "128"],
+      ["Account size", "76,128 bytes"],
+      ["Rent, once", "0.5307 SOL"],
+      ["Best for", "A pair with makers"],
+    ],
+  },
+  {
+    name: "Large",
+    rent: "2.1129",
+    bytes: "303,456",
+    lit: false,
+    rows: [
+      ["Orders per side", "2,048"],
+      ["Seats", "512"],
+      ["Account size", "303,456 bytes"],
+      ["Rent, once", "2.1129 SOL"],
+      ["Best for", "A major"],
+    ],
+  },
+];
+---
+
+<section class="band" id="classes">
+  <div class="shell">
+    <div class="band-head">
+      <p class="tag reveal">Market creation</p>
+      <h2 class="display reveal" style="--delay:60ms">
+        Create a market.<br /><span class="dim">Pick how big it needs to be.</span>
+      </h2>
+      <p class="lede reveal" style="--delay:120ms">
+        Anyone can list any SPL pair, permissionlessly. The book is preallocated, so the one
+        decision that cannot be changed later is how much of it to buy — and that decision
+        is rent you get back if the market is ever closed.
+      </p>
+    </div>
+
+    <div class="cards">
+      {
+        classes.map((klass, index) => (
+          <article
+            class:list={["klass", "reveal", klass.lit && "lit"]}
+            style={`--delay:${index * 80}ms`}
+          >
+            <header>
+              <h3>{klass.name}</h3>
+              <p class="price num">
+                {klass.rent} <span>SOL</span>
+              </p>
+              <p class="sub">one-time rent</p>
+            </header>
+
+            <dl>
+              {klass.rows.map(([term, value]) => (
+                <div class="row">
+                  <dt>{term}</dt>
+                  <dd class="num">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+        ))
+      }
+    </div>
+
+    <p class="foot reveal">
+      Rent is refundable and is the cost of the bytes, not a fee — nothing here is charged
+      by us. Figures asserted in <code>programs/clob/tests/sizes.rs</code>, because a number
+      on a page that nothing checks is a number that drifts.
+    </p>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--ink) 0%, var(--ink-1) 100%);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .klass {
+    display: grid;
+    gap: 1.4rem;
+    padding: 1.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    transition:
+      border-color 0.3s var(--ease),
+      translate 0.3s var(--ease);
+  }
+
+  .klass:hover {
+    translate: 0 -3px;
+    border-color: var(--line-2);
+  }
+
+  /* The lit card, as the reference does it: the recommended choice, not the dearest one. */
+  .klass.lit {
+    border-color: rgb(74 222 155 / 0.3);
+    background: linear-gradient(180deg, rgb(74 222 155 / 0.07) 0%, var(--card) 55%);
+  }
+
+  header {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  h3 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+  }
+
+  .price {
+    font-family: var(--serif);
+    font-size: 2.25rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .price span {
+    font-size: 0.9375rem;
+    color: var(--text-3);
+  }
+
+  .sub {
+    font-size: 0.8125rem;
+    color: var(--text-3);
+  }
+
+  dl {
+    display: grid;
+    gap: 0;
+    margin: 0;
+  }
+
+  .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.875rem;
+  }
+
+  dt {
+    color: var(--text-3);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--text);
+  }
+
+  .foot {
+    margin-top: 1.75rem;
+    font-size: 0.8125rem;
+    color: var(--text-3);
+    text-align: center;
+  }
+
+  .foot code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    color: var(--text-2);
+  }
+</style>

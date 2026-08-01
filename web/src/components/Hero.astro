@@ -1,98 +1,143 @@
 ---
-import ShardField from "./ShardField.astro";
+import Sky from "./Sky.astro";
 import { links, status } from "../site.ts";
+
+/**
+ * The reference puts a "Built on" logo row under its calls to action and a four-figure
+ * statistic band beneath that. Both slots are kept; what goes in them is not.
+ *
+ * Its figures are 4,253 active traders and a Trustpilot score. There are no traders here
+ * and no reviews, so the band carries facts about the thing itself — which are checkable
+ * from the repository, unlike a number of users, and are the numbers this audience would
+ * actually ask for.
+ */
+const built = ["Solana", "SPL Token", "Yellowstone gRPC", "ClickHouse"];
+
+const figures = [
+  { v: "4,639", l: "CU per ladder refresh", tone: true },
+  { v: "501", l: "Tests" },
+  { v: "1", l: "Transaction to settle" },
+  { v: "0", l: "Cranks, oracles, custodians" },
+];
 ---
 
 <section class="hero">
-  <ShardField />
+  <Sky />
 
   <div class="shell inner">
-    <p class="eyebrow">A new kind of order book on Solana</p>
-
-    <h1>
-      Every fill settles inside<br /> the transaction that caused it.
+    <h1 class="display">
+      The Onchain Order Book<br />
+      <span class="dim">That Settles In One Go</span>
     </h1>
 
     <p class="lede">
-      A crankless central limit order book. No off-chain process to settle your trade, no
-      oracle to manipulate, no custody — your balance sits in the market's own vaults and
-      your orders match atomically, in one instruction.
+      Post, cancel and fill in a single transaction. No crank to keep running, no oracle to
+      manipulate, and no custody — your balance sits in the market's own vaults.
     </p>
 
     <div class="actions">
-      <a class="btn btn-primary" href={links.app}>Launch app</a>
-      <a class="btn btn-ghost" href="#compute">See the compute numbers</a>
+      <a class="btn btn-solid" href={links.app}>Launch app</a>
+      <a class="btn btn-line" href="#compute">View compute</a>
     </div>
 
-    <!-- Placed with the calls to action rather than in a footnote. Someone deciding
-         whether to connect a wallet should learn this before they click, not after. -->
-    <p class="chip">
-      <span class="dot"></span>
-      {status.cluster} only · unaudited · not for funds you cannot lose
+    <div class="built">
+      <span>Built on</span>
+      {built.map((name) => <em>{name}</em>)}
+    </div>
+
+    <!-- Beside the buttons, not in a footnote. Someone deciding whether to connect a
+         wallet should read this before they click rather than after. -->
+    <p class="warn">
+      <span class="pip"></span>
+      {status.cluster} · unaudited · not for funds you cannot lose
     </p>
   </div>
 
-  <a class="scroll" href="#problem" aria-label="Continue">
-    <span></span>
-  </a>
+  <div class="shell figures">
+    {
+      figures.map((figure) => (
+        <div class="figure">
+          <span class:list={["v", "num", figure.tone && "lit"]}>{figure.v}</span>
+          <span class="l">{figure.l}</span>
+        </div>
+      ))
+    }
+  </div>
 </section>
 
 <style>
   .hero {
     position: relative;
-    min-height: 100svh;
-    display: grid;
-    align-items: center;
-    overflow: hidden;
     isolation: isolate;
+    display: grid;
+    align-content: center;
+    min-height: 100svh;
+    padding-top: var(--nav-h);
+    overflow: hidden;
   }
 
   .inner {
     position: relative;
     z-index: 1;
     display: grid;
-    gap: 1.75rem;
     justify-items: center;
+    gap: 1.6rem;
     text-align: center;
-    padding-block: 9rem 6rem;
+    padding-block: clamp(4rem, 9vw, 7rem) 3rem;
   }
 
   h1 {
-    font-size: clamp(2.4rem, 6.4vw, 5rem);
-    max-width: 17ch;
+    max-width: 15ch;
   }
 
   .lede {
-    max-width: 54ch;
+    max-width: 46ch;
+    color: #c3cbd1;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.65rem;
     justify-content: center;
-    margin-top: 0.5rem;
   }
 
-  .chip {
+  .built {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 1.4rem;
+    margin-top: 0.6rem;
+    font-size: 0.8125rem;
+    color: var(--text-3);
+  }
+
+  /* Wordmarks rather than logos. Borrowing four companies' trademarks to decorate a page
+     is a licence question nobody needs, and the names carry the same information. */
+  .built em {
+    font-style: normal;
+    color: #b9c2c8;
+  }
+
+  .warn {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-    padding: 0.42rem 0.95rem;
-    border: 1px solid rgb(232 201 160 / 0.28);
+    gap: 0.55rem;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid rgb(74 222 155 / 0.22);
     border-radius: 999px;
-    background: rgb(232 201 160 / 0.07);
-    color: var(--dawn-4);
-    font-size: 0.8125rem;
+    background: rgb(74 222 155 / 0.06);
+    color: #9fd8bd;
+    font-size: 0.78125rem;
   }
 
-  .dot {
-    width: 6px;
-    height: 6px;
+  .pip {
+    width: 5px;
+    height: 5px;
     border-radius: 999px;
-    background: var(--dawn-4);
-    animation: pulse 2.4s var(--ease) infinite;
+    background: var(--green);
+    animation: pulse 2.6s var(--ease) infinite;
   }
 
   @keyframes pulse {
@@ -101,50 +146,38 @@ import { links, status } from "../site.ts";
       opacity: 1;
     }
     50% {
-      opacity: 0.35;
+      opacity: 0.3;
     }
   }
 
-  .scroll {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    translate: -50% 0;
+  .figures {
+    position: relative;
     z-index: 1;
-    width: 24px;
-    height: 38px;
-    border: 1px solid var(--line-strong);
-    border-radius: 999px;
     display: grid;
-    justify-items: center;
-    padding-top: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 2rem 1rem;
+    padding-block: clamp(2.5rem, 5vw, 4rem) 0;
+    text-align: center;
   }
 
-  .scroll span {
-    width: 3px;
-    height: 7px;
-    border-radius: 999px;
-    background: var(--text-3);
-    animation: fall 1.9s var(--ease) infinite;
+  .figure {
+    display: grid;
+    gap: 0.3rem;
   }
 
-  @keyframes fall {
-    0% {
-      translate: 0 0;
-      opacity: 0;
-    }
-    35% {
-      opacity: 1;
-    }
-    100% {
-      translate: 0 13px;
-      opacity: 0;
-    }
+  .v {
+    font-family: var(--serif);
+    font-size: clamp(2.25rem, 4.4vw, 3.25rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
   }
 
-  @media (max-width: 720px) {
-    .scroll {
-      display: none;
-    }
+  .v.lit {
+    color: var(--green);
+  }
+
+  .l {
+    font-size: 0.8125rem;
+    color: var(--text-3);
   }
 </style>
