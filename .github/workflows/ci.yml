@@ -96,9 +96,32 @@ jobs:
         run: cargo test
         working-directory: crates/${{ matrix.workspace }}
 
+  # Three npm packages, each with its own lockfile, because each is its own deploy: the
+  # SDK is published, the app is a static bundle at one origin and the site is a static
+  # bundle at another. A matrix rather than three jobs so adding a fourth is one line, and
+  # `fail-fast: false` so one broken package does not hide the state of the others.
+  #
+  # The app is checked out alongside the SDK and resolves it by path, so a wire-format
+  # change that breaks the app fails here even though `npm ci` never fetched the SDK.
   typescript:
-    name: ts/sdk
+    name: ${{ matrix.package }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Includes the conformance suite against spec/wire-vectors.json. The Rust job
+          # asserts that file still describes the Rust builders; this asserts TypeScript
+          # reproduces it. A wire-format change that updates only one side fails here.
+          - package: ts/sdk
+            test: npm test
+          - package: app
+            test: npm test
+          # No unit tests: the site is content. `astro check` typechecks every component
+          # and the build is what proves the pages actually render — a template that
+          # references a variable nothing defines fails there and nowhere else.
+          - package: web
+            test: npm run build
     steps:
       - uses: actions/checkout@v7
 
@@ -107,19 +130,16 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: ts/sdk/package-lock.json
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
 
       - name: Install
         run: npm ci
-        working-directory: ts/sdk
+        working-directory: ${{ matrix.package }}
 
       - name: Typecheck
         run: npm run typecheck
-        working-directory: ts/sdk
+        working-directory: ${{ matrix.package }}
 
-      # Includes the conformance suite against spec/wire-vectors.json. The Rust job
-      # asserts that file still describes the Rust builders; this asserts TypeScript
-      # reproduces it. A wire-format change that updates only one side fails here.
       - name: Test
-        run: npm test
-        working-directory: ts/sdk
+        run: ${{ matrix.test }}
+        working-directory: ${{ matrix.package }}
