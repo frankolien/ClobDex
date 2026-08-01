@@ -4,6 +4,7 @@
 //! `Arc<Registry>` and never hold its lock across an await.
 
 pub mod http;
+pub mod view;
 pub mod ws;
 
 use std::sync::Arc;

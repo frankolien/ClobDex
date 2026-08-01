@@ -1,54 +1,22 @@
 //! The live feed.
 //!
+//! Socket lifecycle only — what goes down the wire is defined in
+//! [`view`](crate::api::view), the same place the HTTP side reads it from, so neither
+//! transport owns the other's types.
+//!
 //! A subscriber gets the current book once, then every subsequent change to that market.
 //! Sending the snapshot first means a client never has to make a separate HTTP call and
 //! then reconcile a race against the first delta.
 
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_ws::AggregatedMessage;
+use clob_book::Side;
 use futures::StreamExt;
-use serde::Serialize;
 use solana_pubkey::Pubkey;
 use tokio::sync::broadcast::error::RecvError;
 
-use crate::api::http;
+use crate::api::view::{Message, levels_of, trades_of};
 use crate::registry::{Event, Registry};
-
-/// What the socket sends.
-#[derive(Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum Message {
-    /// The book as it stands, sent once on connect.
-    Snapshot {
-        market: String,
-        slot: u64,
-        /// Everything at or below this slot is rooted.
-        finalized_through: u64,
-        bids: Vec<http::Level>,
-        asks: Vec<http::Level>,
-    },
-    /// One transaction's effect.
-    Update {
-        slot: u64,
-        trades: Vec<http::Trade>,
-        /// Best bid and ask after it, when either side has liquidity.
-        best_bid: Option<u64>,
-        best_ask: Option<u64>,
-        /// Everything at or below this slot is rooted. Anything above it can still be
-        /// retracted, which is what a consumer needs in order to decide whether to act.
-        finalized_through: u64,
-    },
-    /// Trades already sent that did not happen: their slot was abandoned.
-    ///
-    /// A client that showed them has to be told. Silence is indistinguishable from a
-    /// quiet market, so the correction is pushed rather than left to be noticed.
-    Retract { slot: u64, trades: usize },
-    /// The subscriber fell too far behind and lost `missed` messages.
-    ///
-    /// Sent rather than silently skipping, because a gap a client does not know about is
-    /// worse than one it does: it can re-request a snapshot.
-    Lagged { missed: u64 },
-}
 
 /// How deep the initial snapshot goes.
 const SNAPSHOT_DEPTH: usize = 50;
@@ -73,22 +41,12 @@ pub async fn stream(
 
     actix_web::rt::spawn(async move {
         if let Some(view) = registry.market(&market) {
-            let levels = |side| {
-                view.state
-                    .level_two(side, SNAPSHOT_DEPTH)
-                    .iter()
-                    .map(|level| http::Level {
-                        price_in_ticks: level.price_in_ticks.as_u64(),
-                        base_lots: level.base_lots.as_u64(),
-                    })
-                    .collect()
-            };
             let snapshot = Message::Snapshot {
                 market: market.to_string(),
                 slot: view.slot,
                 finalized_through: view.finalized_through,
-                bids: levels(clob_book::Side::Bid),
-                asks: levels(clob_book::Side::Ask),
+                bids: levels_of(&view.state, Side::Bid, SNAPSHOT_DEPTH),
+                asks: levels_of(&view.state, Side::Ask, SNAPSHOT_DEPTH),
             };
             if send(&mut session, &snapshot).await.is_err() {
                 return;
@@ -122,7 +80,7 @@ pub async fn stream(
                             .unwrap_or(0);
                         let message = Message::Update {
                             slot: derived.slot,
-                            trades: http::trades_of(&derived.delta, finalized_through),
+                            trades: trades_of(&derived.delta, finalized_through),
                             best_bid: derived.state.best_bid().map(|o| o.price_in_ticks().as_u64()),
                             best_ask: derived.state.best_ask().map(|o| o.price_in_ticks().as_u64()),
                             finalized_through,
@@ -133,8 +91,7 @@ pub async fn stream(
                         if which != market {
                             continue;
                         }
-                        let message = Message::Retract { slot, trades };
-                        if send(&mut session, &message).await.is_err() { break }
+                        if send(&mut session, &Message::Retract { slot, trades }).await.is_err() { break }
                     }
                     Err(RecvError::Lagged(missed)) => {
                         if send(&mut session, &Message::Lagged { missed }).await.is_err() { break }
