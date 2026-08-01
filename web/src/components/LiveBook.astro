@@ -1,0 +1,436 @@
+---
+/**
+ * The product shot, except it moves.
+ *
+ * The reference composites a still screenshot into a photograph. An order book is the one
+ * interface where a still image is actively misleading — the whole point of the thing is
+ * that it changes every slot — so this is a working ladder driven by a random walk, and it
+ * tilts towards the pointer.
+ *
+ * It is simulated, and it says so on the panel. A convincing fake book on a marketing page
+ * that did not admit it would be the one dishonest thing here.
+ */
+
+/** Rows per side. Enough to read as depth, few enough to fit beside the copy. */
+const DEPTH = 7;
+const rows = Array.from({ length: DEPTH }, (_, index) => index);
+---
+
+<section class="band" id="book">
+  <div class="shell grid">
+    <div class="copy">
+      <p class="eyebrow reveal">The interface</p>
+      <h2 class="reveal" style="--delay:60ms">Price, time, and nothing in between.</h2>
+      <p class="lede reveal" style="--delay:120ms">
+        Orders rest in a red-black tree keyed by price and arrival, so the first order at
+        the best price is the first one filled — on both sides, from one comparison. No
+        batch, no auction, no discretion.
+      </p>
+
+      <ul class="points reveal" style="--delay:180ms">
+        <li><b>Post-only</b> rejects rather than crossing, so a maker never pays taker fees by accident.</li>
+        <li><b>Cancel-replace</b> in one instruction, for an entire two-sided ladder.</li>
+        <li><b>Self-trade</b> is detected and removed without printing volume.</li>
+      </ul>
+    </div>
+
+    <div class="panel-wrap reveal" style="--delay:120ms">
+      <div class="panel" id="panel">
+        <header class="head">
+          <span class="pair">SOL <span class="slash">/</span> USDC</span>
+          <span class="tag">Simulated</span>
+        </header>
+
+        <div class="ladder">
+          <div class="col-head"><span>Price</span><span>Size</span></div>
+
+          <ol class="side asks" id="asks">
+            {rows.map(() => (
+              <li class="lvl"><span class="bar" /><span class="p num" /><span class="s num" /></li>
+            ))}
+          </ol>
+
+          <div class="spread">
+            <span class="mid num" id="mid">—</span>
+            <span class="sp num" id="spread">spread —</span>
+          </div>
+
+          <ol class="side bids" id="bids">
+            {rows.map(() => (
+              <li class="lvl"><span class="bar" /><span class="p num" /><span class="s num" /></li>
+            ))}
+          </ol>
+        </div>
+
+        <div class="tape">
+          <div class="col-head"><span>Fills</span><span>Size</span></div>
+          <ol id="tape"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .band {
+    position: relative;
+    padding-block: clamp(6rem, 13vw, 11rem);
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--ink-1) 100%);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+  }
+
+  .copy {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  h2 {
+    font-size: clamp(2rem, 4.4vw, 3.1rem);
+  }
+
+  .points {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .points li {
+    position: relative;
+    padding-left: 1.15rem;
+    font-size: 0.9rem;
+    color: var(--text-2);
+  }
+
+  .points li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 6px;
+    height: 1px;
+    background: var(--data);
+  }
+
+  .points b {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* Perspective on the wrapper, transform on the panel: the wrapper stays a flat box for
+     layout and only its child rotates, so the tilt cannot shift the grid around it. */
+  .panel-wrap {
+    perspective: 1200px;
+  }
+
+  .panel {
+    display: grid;
+    gap: 1px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--line);
+    overflow: hidden;
+    box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.9);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .head,
+  .ladder,
+  .tape {
+    background: #070a12;
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1rem;
+  }
+
+  .pair {
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .slash {
+    color: var(--text-3);
+  }
+
+  /* Not decoration. This book is a random walk, and a marketing page showing a convincing
+     fake without saying so would be the one dishonest thing on it. */
+  .tag {
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .col-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.55rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .side {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .lvl {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    padding: 0.28rem 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  /* Depth behind the numbers, filling from the outside in, so the shape of the book is
+     readable before any of the digits are. */
+  .bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--fill, 0%);
+    transition: width 0.45s var(--ease);
+  }
+
+  .asks .bar {
+    background: linear-gradient(90deg, rgb(224 138 106 / 0.16), rgb(224 138 106 / 0.02));
+  }
+
+  .bids .bar {
+    background: linear-gradient(90deg, rgb(143 212 255 / 0.16), rgb(143 212 255 / 0.02));
+  }
+
+  .p,
+  .s {
+    position: relative;
+  }
+
+  .asks .p {
+    color: #e08a6a;
+  }
+
+  .bids .p {
+    color: var(--ice);
+  }
+
+  .s {
+    color: var(--text-2);
+  }
+
+  /* Cool below, warm above — the same night-to-dawn axis the page runs on, rather than the
+     usual green and red, which would fight the palette and steal the accent from data. */
+  .spread {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    border-block: 1px solid var(--line);
+    background: rgb(255 255 255 / 0.02);
+  }
+
+  .mid {
+    font-size: 1.05rem;
+    transition: color 0.5s var(--ease);
+  }
+
+  .mid.up {
+    color: var(--ice);
+  }
+
+  .mid.down {
+    color: #e08a6a;
+  }
+
+  .sp {
+    font-size: 0.6875rem;
+    color: var(--text-3);
+  }
+
+  .tape ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-height: 5.5rem;
+  }
+
+  .tape li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.26rem 1rem;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    color: var(--text-2);
+    animation: print 0.5s var(--ease) both;
+  }
+
+  .tape li.buy span:first-child {
+    color: var(--ice);
+  }
+
+  .tape li.sell span:first-child {
+    color: #e08a6a;
+  }
+
+  @keyframes print {
+    from {
+      opacity: 0;
+      translate: 0 -6px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  import { ease, pointerTarget } from "../scripts/pointer.ts";
+
+  const panel = document.getElementById("panel");
+  const asks = document.getElementById("asks");
+  const bids = document.getElementById("bids");
+  const tape = document.getElementById("tape");
+  const midOut = document.getElementById("mid");
+  const spreadOut = document.getElementById("spread");
+
+  if (panel && asks && bids && tape && midOut && spreadOut) {
+    const DEPTH = 7;
+    const TICK_MS = 620;
+    const TAPE_ROWS = 5;
+
+    let seed = 0x6d2b79f5;
+    const random = () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return ((seed >>> 0) % 100000) / 100000;
+    };
+
+    // Ticks, as the program stores them. Rendered as a price so the panel reads like the
+    // app, which does exactly this conversion through the SDK's lot maths.
+    let mid = 150_000;
+    let previous = mid;
+
+    const price = (ticks: number) => (ticks / 1000).toFixed(2);
+    const size = (lots: number) => (lots / 1000).toFixed(2);
+
+    const render = () => {
+      const spread = 20 + Math.floor(random() * 30);
+      const askRows = asks.children;
+      const bidRows = bids.children;
+      let widest = 1;
+
+      const levels = Array.from({ length: DEPTH }, () => 400 + Math.floor(random() * 3_600));
+      for (const lots of levels) widest = Math.max(widest, lots);
+
+      for (let index = 0; index < DEPTH; index++) {
+        const lots = levels[index] ?? 0;
+        const fill = `${(lots / widest) * 100}%`;
+
+        // Asks read outward from the spread, so the best ask is the row nearest the middle
+        // — which means filling the list backwards.
+        const ask = askRows[DEPTH - 1 - index] as HTMLElement | undefined;
+        if (ask) {
+          ask.style.setProperty("--fill", fill);
+          ask.querySelector(".p")!.textContent = price(mid + spread / 2 + index * 25);
+          ask.querySelector(".s")!.textContent = size(lots);
+        }
+
+        const bidLots = 400 + Math.floor(random() * 3_600);
+        const bid = bidRows[index] as HTMLElement | undefined;
+        if (bid) {
+          bid.style.setProperty("--fill", `${(bidLots / widest) * 100}%`);
+          bid.querySelector(".p")!.textContent = price(mid - spread / 2 - index * 25);
+          bid.querySelector(".s")!.textContent = size(bidLots);
+        }
+      }
+
+      midOut.textContent = price(mid);
+      midOut.classList.toggle("up", mid > previous);
+      midOut.classList.toggle("down", mid < previous);
+      spreadOut.textContent = `spread ${(spread / 1000).toFixed(3)}`;
+
+      // A fill prints only sometimes. A tape that produces a row on every tick is a
+      // metronome, and nobody believes a market that trades on a schedule.
+      if (random() > 0.42) {
+        const buy = mid >= previous;
+        const row = document.createElement("li");
+        row.className = buy ? "buy" : "sell";
+        row.innerHTML = `<span>${price(mid + (buy ? 10 : -10))}</span><span>${size(
+          80 + Math.floor(random() * 900),
+        )}</span>`;
+        tape.prepend(row);
+        while (tape.children.length > TAPE_ROWS) tape.lastElementChild?.remove();
+      }
+
+      previous = mid;
+      // A random walk with a pull back to the middle, so an unattended panel does not
+      // wander off to a price with no digits in common with where it started.
+      mid += Math.round((random() - 0.5) * 90) + Math.round((150_000 - mid) * 0.04);
+    };
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let frame = 0;
+    const tilt = { x: 0, y: 0 };
+
+    const lean = () => {
+      const pointer = pointerTarget();
+      tilt.x = ease(tilt.x, pointer.x, 0.06);
+      tilt.y = ease(tilt.y, pointer.y, 0.06);
+      // Small angles. A panel that swings is a gimmick; one that barely moves reads as a
+      // solid object catching the light.
+      panel.style.transform = `rotateY(${tilt.x * 5}deg) rotateX(${-tilt.y * 3.5}deg)`;
+      frame = requestAnimationFrame(lean);
+    };
+
+    const start = () => {
+      if (timer) return;
+      timer = setInterval(render, TICK_MS);
+      if (!reduced.matches) frame = requestAnimationFrame(lean);
+    };
+
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+      cancelAnimationFrame(frame);
+    };
+
+    // One render immediately, so the panel is never an empty grid waiting for the first
+    // interval — including when motion is reduced and it stays on that first frame.
+    render();
+
+    if (!reduced.matches) {
+      const visible = new IntersectionObserver(
+        ([entry]) => (entry?.isIntersecting ? start() : stop()),
+        { threshold: 0.15 },
+      );
+      visible.observe(panel);
+      document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+    }
+  }
+</script>

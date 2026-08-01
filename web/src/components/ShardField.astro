@@ -36,6 +36,8 @@
 </style>
 
 <script>
+  import { ease, pointerTarget } from "../scripts/pointer.ts";
+
   type Shard = {
     x: number;
     y: number;
@@ -51,6 +53,9 @@
 
   /** How far the light sweep travels per second, as a fraction of the canvas width. */
   const SWEEP_SPEED = 0.16;
+
+  /** How far the nearest shards lean towards the pointer, as a fraction of the canvas. */
+  const LEAN = 0.05;
 
   const canvas = document.getElementById("shards") as HTMLCanvasElement | null;
   const context = canvas?.getContext("2d", { alpha: true }) ?? null;
@@ -93,6 +98,7 @@
 
     let width = 0;
     let height = 0;
+    const lean = { x: 0, y: 0 };
 
     const resize = () => {
       // Cap the pixel ratio at 2. A 3x phone gains nothing visible from nine times the
@@ -108,6 +114,12 @@
 
     const draw = (seconds: number) => {
       context.clearRect(0, 0, width, height);
+
+      // Eased rather than pinned. The lag is what sells the shards as objects with weight
+      // instead of a layer stuck to the cursor.
+      const pointer = pointerTarget();
+      lean.x = ease(lean.x, pointer.x, 0.05);
+      lean.y = ease(lean.y, pointer.y, 0.05);
 
       // The beam. One long, low-angle wedge of light crossing the field, which is what
       // gives the glass something to be lit by.
@@ -132,8 +144,13 @@
         const angle = shard.rotation + seconds * shard.spin;
         const scale = shard.size * shard.z;
 
+        // Depth drives how far a shard leans, so the near ones sweep past the far ones as
+        // the pointer moves. Equal displacement would slide the whole field like a decal.
+        const leanX = lean.x * LEAN * shard.z * width;
+        const leanY = lean.y * LEAN * shard.z * height * 0.5;
+
         context.save();
-        context.translate(x * width, (y - 0.1) * height);
+        context.translate(x * width + leanX, (y - 0.1) * height + leanY);
         context.rotate(angle);
         context.scale(scale, scale);
 
