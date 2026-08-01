@@ -8,6 +8,7 @@
 //! keypair file, because that one is a secret and does not belong in a document people
 //! copy around.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -37,6 +38,39 @@ pub struct MarketRecord {
     pub payer_base: String,
     /// The payer's quote token account.
     pub payer_quote: String,
+    /// Extra wallets created by `new-trader`, by name.
+    ///
+    /// A market with one participant can only ever produce self-trades: the taker owns
+    /// the liquidity it crosses, no value moves, and no fee is charged. A second wallet
+    /// is what makes a real fill possible.
+    #[serde(default)]
+    pub traders: BTreeMap<String, TraderRecord>,
+}
+
+/// A wallet that can trade on this market, and its token accounts.
+///
+/// The keypair lives beside this file rather than in it — secrets do not belong in a
+/// document people copy around.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TraderRecord {
+    /// The wallet.
+    pub pubkey: String,
+    /// Its base token account.
+    pub base: String,
+    /// Its quote token account.
+    pub quote: String,
+}
+
+impl TraderRecord {
+    /// Where this trader's keypair is kept.
+    pub fn keypair_path(cluster: &str, name: &str) -> PathBuf {
+        Path::new(STORE_DIR).join(format!("{cluster}-trader-{name}.json"))
+    }
+
+    /// Its two token accounts, in the order the builders take them.
+    pub fn token_accounts(&self) -> Result<(Pubkey, Pubkey)> {
+        Ok((parse(&self.base, "base")?, parse(&self.quote, "quote")?))
+    }
 }
 
 impl MarketRecord {
@@ -76,6 +110,18 @@ impl MarketRecord {
     /// The payer's two token accounts, in the order the builders take them.
     pub fn payer_token_accounts(&self) -> Result<(Pubkey, Pubkey)> {
         Ok((parse(&self.payer_base, "payer_base")?, parse(&self.payer_quote, "payer_quote")?))
+    }
+
+    /// Token accounts for a named trader, or the payer's when unnamed.
+    pub fn token_accounts_for(&self, trader: Option<&str>) -> Result<(Pubkey, Pubkey)> {
+        match trader {
+            None => self.payer_token_accounts(),
+            Some(name) => self
+                .traders
+                .get(name)
+                .with_context(|| format!("no trader named {name} — run `new-trader {name}` first"))?
+                .token_accounts(),
+        }
     }
 }
 

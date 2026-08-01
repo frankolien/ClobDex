@@ -139,6 +139,7 @@ pub fn create(client: &Client, cluster: &str, taker_fee_bps: u64) -> Result<()> 
         quote_mint: quote_mint.pubkey().to_string(),
         payer_base: payer_base.pubkey().to_string(),
         payer_quote: payer_quote.pubkey().to_string(),
+        traders: Default::default(),
     };
     let path = record.save(cluster)?;
 

@@ -2,3 +2,4 @@
 
 pub mod market;
 pub mod trade;
+pub mod trader;

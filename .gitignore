@@ -9,3 +9,5 @@
 
 # Markets created by clob-cli, including mint keypairs.
 .clob/
+
+crates/clob-cli/target

@@ -1,4 +1,9 @@
 //! Devnet operations for a ClobDex market.
+//!
+//! Exists so the off-chain half of this project can be tested against a real cluster:
+//! the indexer needs a live market producing real trades before anything it derives can
+//! be believed. Every instruction is built through `clob-client` rather than assembled
+//! here, so using this tool also exercises the SDK.
 
 mod commands;
 mod config;
@@ -23,6 +28,10 @@ struct Cli {
     /// Signer. Defaults to the Solana CLI's keypair.
     #[arg(long, global = true)]
     keypair: Option<std::path::PathBuf>,
+
+    /// Act as a wallet created by `new-trader`, rather than as the payer.
+    #[arg(long, global = true)]
+    trader: Option<String>,
 
     #[command(subcommand)]
     command: Command,
@@ -75,6 +84,14 @@ enum Command {
         #[arg(long)]
         receipt: bool,
     },
+    /// Create a second wallet, funded with SOL and tokens.
+    NewTrader {
+        /// Name to refer to it by, with `--trader`.
+        name: String,
+        /// Whole token units to mint to it, of each side.
+        #[arg(long, default_value_t = 100_000)]
+        units: u64,
+    },
     /// Cancel every resting order on one side.
     CancelAll {
         /// Which side to clear.
@@ -83,7 +100,7 @@ enum Command {
         #[arg(long, default_value_t = 64)]
         limit: u32,
     },
-    /// Print the payer and its SOL balance.
+    /// Print the signer and its SOL balance.
     Balance,
 }
 
@@ -105,23 +122,46 @@ impl From<OrderSide> for Side {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let client = Client::new(Config::load(cli.keypair.as_deref())?);
+    let cluster = &cli.cluster;
+    let as_trader = cli.trader.as_deref();
+
+    // `--trader` names a wallet this CLI created; it signs, and it pays its own fees.
+    // `new-trader` itself is the exception: it has to be signed by the payer, which
+    // holds the mint authority and the SOL.
+    let keypair = match (as_trader, &cli.command) {
+        (Some(name), command) if !matches!(command, Command::NewTrader { .. }) => {
+            Some(store::TraderRecord::keypair_path(cluster, name))
+        }
+        _ => cli.keypair.clone(),
+    };
+    let client = Client::new(Config::load(keypair.as_deref())?);
 
     match cli.command {
-        Command::CreateMarket { fee_bps } => commands::market::create(&client, &cli.cluster, fee_bps),
-        Command::Show { depth } => commands::market::show(&client, &cli.cluster, depth),
-        Command::Fund { base, quote } => commands::trade::fund(&client, &cli.cluster, base, quote),
-        Command::Order { side, price, size, receipt } => {
-            commands::trade::place(&client, &cli.cluster, side.into(), price, size, receipt)
+        Command::CreateMarket { fee_bps } => commands::market::create(&client, cluster, fee_bps),
+        Command::Show { depth } => commands::market::show(&client, cluster, depth),
+        Command::NewTrader { name, units } => {
+            commands::trader::create(&client, cluster, &name, units)
         }
-        Command::Swap { side, price, size, receipt } => {
-            commands::trade::swap(&client, &cli.cluster, side.into(), price, size, receipt)
+        Command::Fund { base, quote } => {
+            commands::trade::fund(&client, cluster, as_trader, base, quote)
         }
+        Command::Order {
+            side,
+            price,
+            size,
+            receipt,
+        } => commands::trade::place(&client, cluster, side.into(), price, size, receipt),
+        Command::Swap {
+            side,
+            price,
+            size,
+            receipt,
+        } => commands::trade::swap(&client, cluster, as_trader, side.into(), price, size, receipt),
         Command::CancelAll { side, limit } => {
-            commands::trade::cancel_all(&client, &cli.cluster, side.into(), limit)
+            commands::trade::cancel_all(&client, cluster, side.into(), limit)
         }
         Command::Balance => {
-            println!("payer   {}", client.payer_key());
+            println!("signer  {}", client.payer_key());
             println!("balance {:.4} SOL", client.balance()? as f64 / 1e9);
             Ok(())
         }
