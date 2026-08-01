@@ -1,0 +1,95 @@
+---
+const steps = [
+  {
+    n: "01",
+    title: "Deposit once",
+    body: "Your tokens move into the market's vaults and your seat is credited. From then on trading touches no token accounts at all, which is most of why it is cheap.",
+  },
+  {
+    n: "02",
+    title: "Quote or take",
+    body: "Orders rest in a red-black tree keyed by price and arrival, so priority is price-time on both sides. A maker replaces an entire two-sided ladder in one instruction.",
+  },
+  {
+    n: "03",
+    title: "Settle in the same instruction",
+    body: "A taker's order matches and both balances move before the transaction ends. There is no crank, no event queue, and no second step that can fail after the first succeeded.",
+  },
+];
+---
+
+<section class="band" id="how">
+  <div class="shell">
+    <div class="band-head">
+      <p class="eyebrow reveal">How it works</p>
+      <h2 class="reveal" style="--delay:60ms">
+        Serum needed a crank. This does not.
+      </h2>
+      <p class="lede reveal" style="--delay:120ms">
+        The first generation of on-chain order books matched in one transaction and settled
+        in another, driven by an off-chain process. When that process stalled, the exchange
+        stalled. Everything here happens in one instruction.
+      </p>
+    </div>
+
+    <ol class="steps">
+      {
+        steps.map((step, index) => (
+          <li class="step reveal" style={`--delay:${index * 90}ms`}>
+            <span class="num n">{step.n}</span>
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--ink-1) 0%, var(--ink-2) 100%);
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .step {
+    display: grid;
+    align-content: start;
+    gap: 0.85rem;
+    padding: clamp(1.75rem, 3.2vw, 2.5rem);
+    background: var(--ink-2);
+    transition: background-color 0.4s var(--ease);
+  }
+
+  .step:hover {
+    background: var(--ink-3);
+  }
+
+  .n {
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    color: var(--data);
+  }
+
+  .step h3 {
+    font-size: 1.3rem;
+  }
+
+  .step p {
+    color: var(--text-2);
+    font-size: 0.9375rem;
+    line-height: 1.62;
+  }
+</style>

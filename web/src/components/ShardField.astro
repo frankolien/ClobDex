@@ -1,0 +1,209 @@
+---
+/**
+ * The hero's moving background.
+ *
+ * The reference does this with a rendered 3D animation. This is a canvas, for reasons that
+ * are not only pragmatic: a video of that quality is tens of megabytes, cannot be the
+ * first thing that paints, and looks wrong at any aspect ratio but the one it was rendered
+ * at. A few hundred lines of arithmetic is about four kilobytes, starts on the first
+ * frame, and fits whatever window it is given.
+ *
+ * It is also the only JavaScript on the page.
+ */
+---
+
+<canvas id="shards" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+
+<style>
+  #shards {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Type sits on top of this, so the middle is darkened and the edges are not. Without it
+     the shards compete with the headline exactly where the headline is. */
+  .veil {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 50% at 50% 45%, rgb(4 5 10 / 0.82) 0%, rgb(4 5 10 / 0) 70%),
+      linear-gradient(180deg, rgb(4 5 10 / 0.7) 0%, rgb(4 5 10 / 0) 25%, var(--ink) 96%);
+  }
+</style>
+
+<script>
+  type Shard = {
+    x: number;
+    y: number;
+    z: number;
+    size: number;
+    spin: number;
+    rotation: number;
+    drift: number;
+    points: [number, number][];
+  };
+
+  const COUNT = 46;
+
+  /** How far the light sweep travels per second, as a fraction of the canvas width. */
+  const SWEEP_SPEED = 0.16;
+
+  const canvas = document.getElementById("shards") as HTMLCanvasElement | null;
+  const context = canvas?.getContext("2d", { alpha: true }) ?? null;
+
+  if (canvas && context) {
+    // A deterministic generator, so the same field appears on every load. A hero that is
+    // subtly different each time is a hero nobody can art-direct.
+    let seed = 0x9e3779b9;
+    const random = () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return ((seed >>> 0) % 100000) / 100000;
+    };
+
+    /** An angular sliver — four to six points around an ellipse, pulled about at random. */
+    const silhouette = (): [number, number][] => {
+      const sides = 4 + Math.floor(random() * 3);
+      const points: [number, number][] = [];
+      for (let index = 0; index < sides; index++) {
+        const angle = (index / sides) * Math.PI * 2 + random() * 0.9;
+        const radius = 0.35 + random() * 0.65;
+        points.push([Math.cos(angle) * radius, Math.sin(angle) * radius * 0.55]);
+      }
+      return points;
+    };
+
+    const shards: Shard[] = Array.from({ length: COUNT }, () => ({
+      x: random(),
+      y: random(),
+      // Depth drives size, speed, opacity and blur together, which is what reads as depth
+      // rather than as a pile of differently sized objects.
+      z: 0.15 + random() * 0.85,
+      size: 14 + random() * 74,
+      spin: (random() - 0.5) * 0.22,
+      rotation: random() * Math.PI * 2,
+      drift: 0.4 + random() * 0.8,
+      points: silhouette(),
+    }));
+
+    let width = 0;
+    let height = 0;
+
+    const resize = () => {
+      // Cap the pixel ratio at 2. A 3x phone gains nothing visible from nine times the
+      // fill rate, and this is a background.
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const box = canvas.getBoundingClientRect();
+      width = box.width;
+      height = box.height;
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    };
+
+    const draw = (seconds: number) => {
+      context.clearRect(0, 0, width, height);
+
+      // The beam. One long, low-angle wedge of light crossing the field, which is what
+      // gives the glass something to be lit by.
+      const sweep = ((seconds * SWEEP_SPEED) % 1.6) - 0.3;
+      const beam = context.createLinearGradient(
+        sweep * width - width * 0.3,
+        height * 0.25,
+        sweep * width + width * 0.45,
+        height * 0.75,
+      );
+      beam.addColorStop(0, "rgba(143, 212, 255, 0)");
+      beam.addColorStop(0.5, "rgba(143, 212, 255, 0.16)");
+      beam.addColorStop(1, "rgba(143, 212, 255, 0)");
+      context.fillStyle = beam;
+      context.fillRect(0, 0, width, height);
+
+      for (const shard of shards) {
+        // Wrap rather than respawn: a shard that vanishes and reappears is a flicker, and
+        // at this size the eye catches it.
+        const y = (shard.y + seconds * 0.012 * shard.drift) % 1.2;
+        const x = shard.x + Math.sin(seconds * 0.18 * shard.drift + shard.x * 9) * 0.02;
+        const angle = shard.rotation + seconds * shard.spin;
+        const scale = shard.size * shard.z;
+
+        context.save();
+        context.translate(x * width, (y - 0.1) * height);
+        context.rotate(angle);
+        context.scale(scale, scale);
+
+        context.beginPath();
+        const [first, ...rest] = shard.points;
+        if (first) context.moveTo(first[0], first[1]);
+        for (const [px, py] of rest) context.lineTo(px, py);
+        context.closePath();
+
+        // Nearer shards are brighter and more opaque; far ones fade into the background.
+        const face = context.createLinearGradient(-1, -1, 1, 1);
+        face.addColorStop(0, `rgba(190, 232, 255, ${0.05 + shard.z * 0.14})`);
+        face.addColorStop(0.55, `rgba(120, 190, 245, ${0.02 + shard.z * 0.06})`);
+        face.addColorStop(1, `rgba(60, 120, 190, ${0.01 + shard.z * 0.05})`);
+        context.fillStyle = face;
+        context.fill();
+
+        context.lineWidth = 1 / scale;
+        context.strokeStyle = `rgba(200, 240, 255, ${0.08 + shard.z * 0.22})`;
+        context.stroke();
+        context.restore();
+      }
+    };
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    let running = false;
+
+    const loop = (timestamp: number) => {
+      draw(timestamp / 1000);
+      frame = requestAnimationFrame(loop);
+    };
+
+    const start = () => {
+      if (running || reduced.matches) return;
+      running = true;
+      frame = requestAnimationFrame(loop);
+    };
+
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frame);
+    };
+
+    // Off-screen and background tabs cost nothing. A canvas that keeps animating behind
+    // the rest of the page is a battery drain nobody asked for and nobody can see.
+    const visible = new IntersectionObserver(
+      ([entry]) => (entry?.isIntersecting ? start() : stop()),
+      { threshold: 0 },
+    );
+    visible.observe(canvas);
+
+    document.addEventListener("visibilitychange", () =>
+      document.hidden ? stop() : start(),
+    );
+
+    // Asked to reduce motion: one frame, so the hero still has a background rather than a
+    // black rectangle where the design was.
+    const settle = () => {
+      resize();
+      if (reduced.matches) {
+        stop();
+        draw(0);
+      } else {
+        start();
+      }
+    };
+
+    reduced.addEventListener("change", settle);
+    window.addEventListener("resize", settle, { passive: true });
+    settle();
+  }
+</script>

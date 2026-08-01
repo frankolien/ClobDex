@@ -1,0 +1,60 @@
+---
+import { links, status } from "../site.ts";
+---
+
+<footer>
+  <div class="shell inner">
+    <p class="mark">ClobDex</p>
+
+    <nav aria-label="Footer">
+      <a href={links.github} rel="noopener">GitHub</a>
+      <a href={links.benchmarks} rel="noopener">Benchmarks</a>
+      <a href={links.sdk} rel="noopener">SDK</a>
+      <a href={links.app}>App</a>
+    </nav>
+
+    <p class="fine">
+      {status.cluster} · unaudited · MIT. Nothing here is financial advice or an offer of
+      anything.
+    </p>
+  </div>
+</footer>
+
+<style>
+  footer {
+    padding-block: 3rem;
+    background: var(--ink);
+    border-top: 1px solid var(--line);
+  }
+
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .mark {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.35rem;
+    font-size: 0.875rem;
+    color: var(--text-2);
+  }
+
+  nav a:hover {
+    color: var(--text);
+  }
+
+  .fine {
+    flex-basis: 100%;
+    font-size: 0.78rem;
+    color: var(--text-3);
+  }
+</style>

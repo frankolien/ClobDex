@@ -1,0 +1,76 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- The page is dark by design rather than by preference, so the browser is told
+         before it paints a white frame behind it. -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#04050a" />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2304050a'/%3E%3Cpath d='M9 20h4v4H9zM9 14h4v4H9zM15 8h4v4h-4zM21 14h4v4h-4z' fill='%23c8f751'/%3E%3C/svg%3E"
+    />
+
+    <script is:inline>
+      // Before first paint, so revealed content never flashes in. Without JavaScript this
+      // class is absent and every `.reveal` stays visible — the animation is an
+      // enhancement and its absence is a readable page, not an empty one.
+      document.documentElement.classList.add("js");
+    </script>
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Nav />
+    <main id="main"><slot /></main>
+    <Footer />
+
+    <script>
+      import { observeReveals } from "../scripts/reveal.ts";
+      observeReveals();
+    </script>
+
+    <style>
+      .skip {
+        position: absolute;
+        left: -9999px;
+        z-index: 100;
+        padding: 0.7rem 1.1rem;
+        background: var(--text);
+        color: var(--ink);
+        border-radius: 0 0 8px 0;
+      }
+
+      .skip:focus {
+        left: 0;
+        top: 0;
+      }
+    </style>
+  </body>
+</html>

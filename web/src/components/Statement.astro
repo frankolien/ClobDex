@@ -1,0 +1,87 @@
+---
+/**
+ * The scroll-driven text reveal from the reference: words brightening as they arrive.
+ *
+ * Built with `animation-timeline: view()`, so the browser drives it from scroll position
+ * with no JavaScript at all. Where that is unsupported the words simply render at full
+ * brightness, which is the paragraph — the effect is the enhancement, not the content.
+ */
+
+interface Props {
+  eyebrow: string;
+  text: string;
+  /** Words rendered in the data colour: the claim the paragraph turns on. */
+  emphasis?: string[];
+}
+
+const { eyebrow, text, emphasis = [] } = Astro.props;
+const words = text.split(" ");
+---
+
+<section class="band" id="problem">
+  <div class="shell">
+    <p class="eyebrow reveal">{eyebrow}</p>
+    <p class="statement">
+      {
+        words.map((word) => (
+          <span class:list={["word", emphasis.includes(word.replace(/[^\w-]/g, "")) && "hit"]}>
+            {word}{" "}
+          </span>
+        ))
+      }
+    </p>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--ink) 0%, var(--ink-1) 100%);
+  }
+
+  .statement {
+    margin-top: 2.5rem;
+    font-size: clamp(1.6rem, 4.1vw, 2.9rem);
+    font-weight: 500;
+    line-height: 1.28;
+    letter-spacing: -0.03em;
+    max-width: 22ch;
+    text-wrap: balance;
+  }
+
+  .word {
+    color: var(--text-3);
+    transition: color 0.4s var(--ease);
+  }
+
+  .hit {
+    color: var(--data);
+  }
+
+  /* Each word brightens as the paragraph crosses the viewport. `view()` ties the timeline
+     to this element's own position, so the effect is per-paragraph rather than per-page. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .word {
+        animation: lighten linear both;
+        animation-timeline: view();
+        animation-range: cover 18% cover 62%;
+      }
+
+      .hit {
+        animation-name: lighten-hit;
+      }
+    }
+  }
+
+  @keyframes lighten {
+    to {
+      color: var(--text);
+    }
+  }
+
+  @keyframes lighten-hit {
+    to {
+      color: var(--data);
+    }
+  }
+</style>

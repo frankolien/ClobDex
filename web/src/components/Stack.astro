@@ -1,0 +1,117 @@
+---
+import { links } from "../site.ts";
+
+const pieces = [
+  {
+    name: "The program",
+    body: "Native Rust, no framework. Red-black trees over Pod nodes in one market account. Thirteen instructions, every one benchmarked.",
+    meta: "Rust · SBF",
+    href: links.github,
+  },
+  {
+    name: "The indexer",
+    body: "Streams the chain, derives the tape by diffing the book, and serves REST and WebSocket. Handles rollbacks: an abandoned slot retracts the trades it produced.",
+    meta: "Rust · actix",
+    href: links.indexer,
+  },
+  {
+    name: "Two SDKs",
+    body: "Rust and TypeScript, held to the same bytes by a shared vector file. A wire-format change that updates one side fails the other's tests.",
+    meta: "Rust · TypeScript",
+    href: links.sdk,
+  },
+  {
+    name: "A market maker",
+    body: "A working bot, not a snippet. Inventory skew, post-only ladders that cannot cross, and a replace policy that does not thrash.",
+    meta: "Rust",
+    href: links.github,
+  },
+];
+---
+
+<section class="band" id="stack">
+  <div class="shell">
+    <div class="band-head">
+      <p class="eyebrow reveal">What is actually built</p>
+      <h2 class="reveal" style="--delay:60ms">The half most venues leave to someone else.</h2>
+      <p class="lede reveal" style="--delay:120ms">
+        A program on its own is not a venue. Somebody still has to index it, serve its data,
+        quote into it and integrate it. All of that is here and open.
+      </p>
+    </div>
+
+    <div class="cards">
+      {
+        pieces.map((piece, index) => (
+          <a class="card reveal" style={`--delay:${index * 70}ms`} href={piece.href} rel="noopener">
+            <span class="meta num">{piece.meta}</span>
+            <h3>{piece.name}</h3>
+            <p>{piece.body}</p>
+            <span class="go">View source →</span>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--dawn-1) 0%, var(--dawn-2) 100%);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 1rem;
+  }
+
+  .card {
+    display: grid;
+    align-content: start;
+    gap: 0.7rem;
+    padding: 1.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgb(4 5 10 / 0.32);
+    backdrop-filter: blur(8px);
+    transition:
+      border-color 0.35s var(--ease),
+      translate 0.35s var(--ease),
+      background-color 0.35s var(--ease);
+  }
+
+  .card:hover {
+    translate: 0 -3px;
+    border-color: var(--line-strong);
+    background: rgb(4 5 10 / 0.5);
+  }
+
+  .meta {
+    font-size: 0.6875rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--data);
+  }
+
+  .card h3 {
+    font-size: 1.2rem;
+  }
+
+  .card p {
+    color: var(--text-2);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .go {
+    margin-top: 0.4rem;
+    font-size: 0.8125rem;
+    color: var(--text-3);
+    transition: color 0.3s var(--ease);
+  }
+
+  .card:hover .go {
+    color: var(--text);
+  }
+</style>

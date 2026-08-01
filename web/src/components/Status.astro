@@ -1,0 +1,146 @@
+---
+import { status } from "../site.ts";
+
+/**
+ * The section a landing page usually leaves out.
+ *
+ * A page that looks this finished implies a product that is finished, and this one is not.
+ * Saying so here costs a little credibility with someone skimming and earns all of it back
+ * with the audience that matters — makers, integrators and auditors all check anyway, and
+ * finding it stated is worth more than finding it hidden.
+ */
+
+const shipped = [
+  "Thirteen instructions, live on devnet",
+  "501 tests, including conserve-funds fuzzing through the compiled binary",
+  "Vault solvency asserted, not just internal consistency",
+  "Compute benchmarked and published with the method",
+  "Indexer, two SDKs and a reference market maker",
+];
+
+const notYet = [
+  "No security audit. This is the gating item before mainnet.",
+  "No mainnet deployment, and no date being promised for one.",
+  "No global orders yet — the capital efficiency wedge is designed, not built.",
+  "Upgrade authority is a single key, not yet a multisig.",
+  "Not routed by any aggregator.",
+];
+---
+
+<section class="band" id="status">
+  <div class="shell">
+    <div class="band-head">
+      <p class="eyebrow reveal">Where this actually is</p>
+      <h2 class="reveal" style="--delay:60ms">Unaudited, on {status.cluster.toLowerCase()}.</h2>
+      <p class="lede reveal" style="--delay:120ms">
+        Everything above is real and reproducible from the repository. None of it is a
+        substitute for an audit, and this is not somewhere to put money you need back.
+      </p>
+    </div>
+
+    <div class="columns">
+      <div class="col reveal">
+        <h3><span class="tick">✓</span> Built and tested</h3>
+        <ul>{shipped.map((item) => <li>{item}</li>)}</ul>
+      </div>
+
+      <div class="col reveal" style="--delay:100ms">
+        <h3><span class="cross">×</span> Not done</h3>
+        <ul class="pending">{notYet.map((item) => <li>{item}</li>)}</ul>
+      </div>
+    </div>
+
+    <p class="addr num reveal">
+      Program <span>{status.programAddress}</span>
+    </p>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--dawn-2) 0%, var(--dawn-3) 100%);
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+  }
+
+  .col {
+    padding: 1.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: rgb(4 5 10 / 0.42);
+    backdrop-filter: blur(10px);
+  }
+
+  .col h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.05rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .tick,
+  .cross {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+  }
+
+  .tick {
+    background: rgb(200 247 81 / 0.16);
+    color: var(--data);
+  }
+
+  .cross {
+    background: rgb(255 255 255 / 0.1);
+    color: var(--text-2);
+  }
+
+  ul {
+    display: grid;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    position: relative;
+    padding-left: 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--text-2);
+  }
+
+  li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 5px;
+    height: 1px;
+    background: var(--data);
+  }
+
+  .pending li::before {
+    background: var(--text-3);
+  }
+
+  .addr {
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+    color: rgb(4 5 10 / 0.55);
+    word-break: break-all;
+  }
+
+  .addr span {
+    color: rgb(4 5 10 / 0.8);
+  }
+</style>

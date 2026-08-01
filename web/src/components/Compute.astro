@@ -1,0 +1,227 @@
+---
+import { links } from "../site.ts";
+
+/**
+ * Every figure here is from BENCHMARKS.md, measured against the compiled SBF binary with
+ * Mollusk on a Small market at 2 bps. Nothing is estimated and nothing is rounded in this
+ * direction or that. If the table there changes, this changes.
+ */
+const rows = [
+  { what: "Claim a seat", cu: 227, note: "Once per wallet, per market" },
+  { what: "Post-only, empty book", cu: 574, note: "The cheapest thing a maker does" },
+  { what: "Cancel one order", cu: 844, note: "" },
+  { what: "Market order, one level", cu: 1_500, note: "" },
+  { what: "Batch: 4 cancels, 4 places", cu: 3_251, note: "An entire two-sided ladder" },
+  { what: "Market order, four levels", cu: 4_480, note: "About 1,000 CU per level after the first" },
+  { what: "Swap, no seat", cu: 6_417, note: "Both legs through the token program" },
+];
+
+const budget = 1_400_000;
+---
+
+<section class="band" id="compute">
+  <div class="shell">
+    <div class="band-head">
+      <p class="eyebrow reveal">Measured, not estimated</p>
+      <h2 class="reveal" style="--delay:60ms">
+        Compute is the constraint. Here is ours.
+      </h2>
+      <p class="lede reveal" style="--delay:120ms">
+        Compute decides how deep a taker can sweep, how many quotes a maker can refresh at
+        once, and whether an aggregator's route through you fits its budget at all. Every
+        number below comes from executing the compiled binary — not from a model of it.
+      </p>
+    </div>
+
+    <div class="grid">
+      <ul class="table reveal">
+        {
+          rows.map((row) => (
+            <li class="row">
+              <span class="what">
+                {row.what}
+                {row.note && <em>{row.note}</em>}
+              </span>
+              <span class="cu num">{row.cu.toLocaleString("en-US")}</span>
+              <span class="bar" style={`--fill:${(row.cu / 7000) * 100}%`} />
+            </li>
+          ))
+        }
+      </ul>
+
+      <aside class="notes">
+        <div class="note reveal" style="--delay:80ms">
+          <p class="k num data">32%</p>
+          <p>
+            cheaper to batch four cancels and four places than to send them as eight
+            instructions — 4,639 CU against 6,820, measured on one fixture. One transaction
+            instead of eight matters more: eight is eight signatures and eight chances to
+            land out of order.
+          </p>
+        </div>
+
+        <div class="note reveal" style="--delay:160ms">
+          <p class="k num data">0.2%</p>
+          <p>
+            of a {budget.toLocaleString("en-US")} CU transaction is what a full ladder
+            refresh costs. The binding constraint on a sweep is the match limit the caller
+            sets, not the budget.
+          </p>
+        </div>
+
+        <div class="note reveal" style="--delay:240ms">
+          <p class="k num">log n</p>
+          <p>
+            is how seat lookup scales — 782 CU at two seats, 863 at thirty. A scan would tax
+            a market for succeeding, and since seats are cheap and permissionless it would
+            be a griefing vector too. A test asserts the shape.
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- The part most venues leave out. A number is only worth something if the method
+         behind it can be pointed at whatever you want to compare against. -->
+    <p class="method reveal">
+      No comparison column, deliberately: we have not measured other venues, and filling it
+      in with figures that look authoritative would be worse than leaving it empty. The
+      method is published and needs no cooperation from anyone — <code>simulateTransaction</code>
+      requires no signature that spends anything, so the same procedure runs against any
+      program on the chain, including this one.
+      <a href={links.benchmarks} rel="noopener">Read the method →</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .band {
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--dawn-1) 100%);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    align-items: start;
+  }
+
+  .table {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: rgb(4 5 10 / 0.4);
+  }
+
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.35rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .row:last-child {
+    border-bottom: 0;
+  }
+
+  .what {
+    display: grid;
+    gap: 0.15rem;
+    font-size: 0.9375rem;
+  }
+
+  .what em {
+    font-style: normal;
+    font-size: 0.8125rem;
+    color: var(--text-3);
+  }
+
+  .cu {
+    font-size: 1.05rem;
+    color: var(--data);
+  }
+
+  /* The bar grows as its row arrives, so the column reads as a comparison rather than as
+     a list of numbers. Width is set from the datum, not animated to an arbitrary place. */
+  .bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    width: var(--fill);
+    background: linear-gradient(90deg, rgb(200 247 81 / 0.05), rgb(200 247 81 / 0.5));
+    transform-origin: left;
+    scale: 0 1;
+    transition: scale 1.1s var(--ease);
+    transition-delay: 0.15s;
+  }
+
+  .table.in .bar {
+    scale: 1 1;
+  }
+
+  .notes {
+    display: grid;
+    gap: 1px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .note {
+    display: grid;
+    gap: 0.5rem;
+    padding: 1.4rem 1.5rem;
+    background: rgb(4 5 10 / 0.45);
+  }
+
+  .note p:last-child {
+    color: var(--text-2);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .k {
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .method {
+    margin-top: 2.5rem;
+    padding: 1.35rem 1.5rem;
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--dawn-3);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--text-2);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    max-width: 74ch;
+  }
+
+  .method code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    color: var(--text);
+  }
+
+  .method a {
+    color: var(--dawn-4);
+    white-space: nowrap;
+  }
+
+  .method a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

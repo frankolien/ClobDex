@@ -1,0 +1,30 @@
+---
+import Base from "../layouts/Base.astro";
+import Hero from "../components/Hero.astro";
+import Statement from "../components/Statement.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import Compute from "../components/Compute.astro";
+import Stack from "../components/Stack.astro";
+import Status from "../components/Status.astro";
+import Cta from "../components/Cta.astro";
+
+const problem =
+  "An automated market maker quotes both sides of every price at once, forever, whether or not anyone wants them. It cannot cancel. So it is picked off every time the market moves, and its holders pay for that in returns they never see billed.";
+---
+
+<Base
+  title="ClobDex — a crankless on-chain order book on Solana"
+  description="Post, cancel and fill in a single transaction. No crank, no oracle, no custody. A market maker refreshes an entire two-sided ladder for 4,639 compute units."
+>
+  <Hero />
+  <Statement
+    eyebrow="Why an order book"
+    text={problem}
+    emphasis={["cancel", "picked", "off"]}
+  />
+  <HowItWorks />
+  <Compute />
+  <Stack />
+  <Status />
+  <Cta />
+</Base>

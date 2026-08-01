@@ -1,0 +1,150 @@
+---
+import ShardField from "./ShardField.astro";
+import { links, status } from "../site.ts";
+---
+
+<section class="hero">
+  <ShardField />
+
+  <div class="shell inner">
+    <p class="eyebrow">A new kind of order book on Solana</p>
+
+    <h1>
+      Every fill settles inside<br /> the transaction that caused it.
+    </h1>
+
+    <p class="lede">
+      A crankless central limit order book. No off-chain process to settle your trade, no
+      oracle to manipulate, no custody — your balance sits in the market's own vaults and
+      your orders match atomically, in one instruction.
+    </p>
+
+    <div class="actions">
+      <a class="btn btn-primary" href={links.app}>Launch app</a>
+      <a class="btn btn-ghost" href="#compute">See the compute numbers</a>
+    </div>
+
+    <!-- Placed with the calls to action rather than in a footnote. Someone deciding
+         whether to connect a wallet should learn this before they click, not after. -->
+    <p class="chip">
+      <span class="dot"></span>
+      {status.cluster} only · unaudited · not for funds you cannot lose
+    </p>
+  </div>
+
+  <a class="scroll" href="#problem" aria-label="Continue">
+    <span></span>
+  </a>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    align-items: center;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 1.75rem;
+    justify-items: center;
+    text-align: center;
+    padding-block: 9rem 6rem;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 6.4vw, 5rem);
+    max-width: 17ch;
+  }
+
+  .lede {
+    max-width: 54ch;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+    padding: 0.42rem 0.95rem;
+    border: 1px solid rgb(232 201 160 / 0.28);
+    border-radius: 999px;
+    background: rgb(232 201 160 / 0.07);
+    color: var(--dawn-4);
+    font-size: 0.8125rem;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--dawn-4);
+    animation: pulse 2.4s var(--ease) infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .scroll {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    translate: -50% 0;
+    z-index: 1;
+    width: 24px;
+    height: 38px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    display: grid;
+    justify-items: center;
+    padding-top: 8px;
+  }
+
+  .scroll span {
+    width: 3px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--text-3);
+    animation: fall 1.9s var(--ease) infinite;
+  }
+
+  @keyframes fall {
+    0% {
+      translate: 0 0;
+      opacity: 0;
+    }
+    35% {
+      opacity: 1;
+    }
+    100% {
+      translate: 0 13px;
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .scroll {
+      display: none;
+    }
+  }
+</style>
