@@ -1,0 +1,18 @@
+# Its own workspace — see the `exclude` note in the root Cargo.toml.
+[workspace]
+
+[package]
+name = "clob-mm"
+version = "0.1.0"
+description = "A reference market maker for a ClobDex market."
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ClobDex/clobdex"
+rust-version = "1.85"
+readme = "README.md"
+publish = false
+
+[dependencies]
+clob-book = { path = "../clob-book" }
+clob-client = { path = "../clob-client" }
+clob-engine = { path = "../clob-engine" }

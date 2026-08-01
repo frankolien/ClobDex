@@ -1,5 +1,5 @@
 # Unanchored, so it matches every workspace's build output and not just the root's.
-# clob-cli, clob-ops and clob-stream are separate workspaces, each with its own target.
+# The off-chain tools are separate workspaces, each with its own target directory.
 target/
 **/*.rs.bk
 .DS_Store
