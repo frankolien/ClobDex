@@ -13,6 +13,7 @@
 #![deny(missing_docs)]
 
 pub mod fair;
+pub mod inventory;
 pub mod params;
 
 pub use params::{Params, ParamsError};
