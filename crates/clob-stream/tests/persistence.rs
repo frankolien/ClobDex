@@ -11,7 +11,7 @@ use clob_book::{BaseLots, FIFOOrderId, QuoteLots, Side, Ticks};
 use clob_indexer::Trade;
 use clob_stream::candle;
 use clob_stream::flush::{Pending, flush};
-use clob_stream::store::{Memory, Range, StoredTrade, Store};
+use clob_stream::store::{Checkpoint, Memory, Range, StoredTrade, Store};
 use solana_pubkey::Pubkey;
 
 const MARKET: Pubkey = Pubkey::new_from_array([1u8; 32]);
@@ -118,6 +118,15 @@ async fn a_failed_write_keeps_the_trades_for_the_next_attempt() {
         }
         async fn highest_slot(&self, _: &Pubkey) -> anyhow::Result<Option<u64>> {
             Ok(None)
+        }
+        async fn save_checkpoint(&self, _: &Pubkey, _: &Checkpoint) -> anyhow::Result<()> {
+            anyhow::bail!("unreachable")
+        }
+        async fn checkpoint(&self, _: &Pubkey) -> anyhow::Result<Option<Checkpoint>> {
+            Ok(None)
+        }
+        async fn checkpointed_markets(&self) -> anyhow::Result<Vec<Pubkey>> {
+            Ok(Vec::new())
         }
     }
 

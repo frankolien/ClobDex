@@ -16,10 +16,13 @@
 use anyhow::{Context, Result, bail};
 use solana_pubkey::Pubkey;
 
-use super::{Range, StoredTrade, Store};
+use super::{Checkpoint, Range, StoredTrade, Store};
 
-/// The table this writes to.
+/// The table trades are written to.
 pub const TABLE: &str = "clob_trades";
+
+/// The table market checkpoints are written to.
+pub const CHECKPOINT_TABLE: &str = "clob_checkpoints";
 
 /// A ClickHouse endpoint.
 pub struct ClickHouse {
@@ -71,6 +74,19 @@ impl ClickHouse {
             self.database
         ))
         .await?;
+
+        // One row per market, the highest slot winning. ReplacingMergeTree's version
+        // column does exactly that, so a late write cannot overwrite a newer checkpoint.
+        self.execute(&format!(
+            "CREATE TABLE IF NOT EXISTS {}.{CHECKPOINT_TABLE} (
+                market String,
+                slot   UInt64,
+                data   String
+             ) ENGINE = ReplacingMergeTree(slot)
+             ORDER BY market",
+            self.database
+        ))
+        .await?;
         Ok(())
     }
 
@@ -96,6 +112,16 @@ impl ClickHouse {
 /// Hex, because a signature is 64 raw bytes and SQL string literals are not.
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Hex of any length, for the account blob a checkpoint carries.
+fn unhex_bytes(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len() / 2)
+        .map(|index| u8::from_str_radix(text.get(index * 2..index * 2 + 2)?, 16).ok())
+        .collect()
 }
 
 fn unhex(text: &str) -> Option<[u8; 64]> {
@@ -160,6 +186,55 @@ impl Store for ClickHouse {
             .await?;
 
         body.lines().filter(|line| !line.is_empty()).map(parse).collect()
+    }
+
+    async fn save_checkpoint(&self, market: &Pubkey, checkpoint: &Checkpoint) -> Result<()> {
+        // Hex rather than base64: TabSeparated has no escaping, and hex cannot contain a
+        // tab, a newline, or a backslash whatever the bytes are.
+        self.execute(&format!(
+            "INSERT INTO {}.{CHECKPOINT_TABLE} FORMAT TabSeparated\n{market}\t{}\t{}",
+            self.database,
+            checkpoint.slot,
+            hex(&checkpoint.data)
+        ))
+        .await?;
+        Ok(())
+    }
+
+    async fn checkpoint(&self, market: &Pubkey) -> Result<Option<Checkpoint>> {
+        let body = self
+            .execute(&format!(
+                "SELECT slot, data FROM {}.{CHECKPOINT_TABLE} FINAL
+                 WHERE market = '{market}' FORMAT TabSeparated",
+                self.database
+            ))
+            .await?;
+
+        let Some(line) = body.lines().find(|line| !line.is_empty()) else {
+            return Ok(None);
+        };
+        let (slot, data) = line
+            .split_once('\t')
+            .context("a checkpoint row had no data column")?;
+
+        Ok(Some(Checkpoint {
+            slot: slot.parse().context("a checkpoint slot was not a number")?,
+            data: unhex_bytes(data).context("checkpoint data was not hex")?,
+        }))
+    }
+
+    async fn checkpointed_markets(&self) -> Result<Vec<Pubkey>> {
+        let body = self
+            .execute(&format!(
+                "SELECT market FROM {}.{CHECKPOINT_TABLE} FINAL FORMAT TabSeparated",
+                self.database
+            ))
+            .await?;
+
+        body.lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| line.parse().context("a checkpoint market was not a pubkey"))
+            .collect()
     }
 
     async fn highest_slot(&self, market: &Pubkey) -> Result<Option<u64>> {
@@ -256,6 +331,18 @@ mod tests {
         // Padding would attribute a trade to a transaction that does not exist.
         assert_eq!(unhex("00"), None);
         assert_eq!(unhex(&"z".repeat(128)), None);
+    }
+
+    #[test]
+    fn a_checkpoint_blob_survives_hex_at_any_length() {
+        // A market account is 19 KB, not 64 bytes, so it needs the variable-length path.
+        let data: Vec<u8> = (0..1000).map(|index| index as u8).collect();
+        assert_eq!(unhex_bytes(&hex(&data)), Some(data));
+    }
+
+    #[test]
+    fn odd_length_hex_is_refused_rather_than_truncated() {
+        assert_eq!(unhex_bytes("abc"), None);
     }
 
     #[test]

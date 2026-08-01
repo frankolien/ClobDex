@@ -49,6 +49,20 @@ pub struct StoredTrade {
     pub taker_side_is_bid: bool,
 }
 
+/// A market's raw account bytes at a rooted slot.
+///
+/// Trades alone are not enough to resume: derivation diffs one book against another, so
+/// picking up where a previous process stopped needs the book as it stood there. Without
+/// it, a restart can only baseline on the next update it happens to see — losing that
+/// transaction and everything between the two runs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// Slot the bytes are true at. Rooted, so it cannot be rolled back.
+    pub slot: u64,
+    /// The account's full data.
+    pub data: Vec<u8>,
+}
+
 /// A query over stored trades.
 #[derive(Copy, Clone, Debug)]
 pub struct Range {
@@ -92,4 +106,19 @@ pub trait Store: Send + Sync {
     /// Read at startup so a restart resumes where it left off instead of re-flushing
     /// everything it can still see.
     async fn highest_slot(&self, market: &Pubkey) -> Result<Option<u64>>;
+
+    /// Records a market's state at a rooted slot, replacing any earlier one.
+    ///
+    /// Only ever called with rooted state, so a checkpoint can never describe a book
+    /// that was later rolled back.
+    async fn save_checkpoint(&self, market: &Pubkey, checkpoint: &Checkpoint) -> Result<()>;
+
+    /// The most recent checkpoint for a market.
+    async fn checkpoint(&self, market: &Pubkey) -> Result<Option<Checkpoint>>;
+
+    /// Every market that has a checkpoint.
+    ///
+    /// Read at startup to decide where to resume the stream from, before any market is
+    /// known from anywhere else.
+    async fn checkpointed_markets(&self) -> Result<Vec<Pubkey>>;
 }

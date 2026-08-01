@@ -10,13 +10,15 @@ use std::sync::RwLock;
 use anyhow::Result;
 use solana_pubkey::Pubkey;
 
-use super::{Range, StoredTrade, Store};
+use super::{Checkpoint, Range, StoredTrade, Store};
 
 /// Trades kept in the process.
 #[derive(Default)]
 pub struct Memory {
     /// Per market, ordered by slot as written.
     trades: RwLock<HashMap<Pubkey, Vec<StoredTrade>>>,
+    /// The latest rooted state per market.
+    checkpoints: RwLock<HashMap<Pubkey, Checkpoint>>,
 }
 
 impl Memory {
@@ -92,5 +94,37 @@ impl Store for Memory {
             .expect("store lock poisoned")
             .get(market)
             .and_then(|trades| trades.iter().map(|trade| trade.slot).max()))
+    }
+
+    async fn save_checkpoint(&self, market: &Pubkey, checkpoint: &Checkpoint) -> Result<()> {
+        let mut checkpoints = self.checkpoints.write().expect("store lock poisoned");
+        // Never move a checkpoint backwards: an out-of-order write would make a restart
+        // replay from further back than it needs to, or worse, from a stale book.
+        let replace = checkpoints
+            .get(market)
+            .is_none_or(|existing| checkpoint.slot > existing.slot);
+        if replace {
+            checkpoints.insert(*market, checkpoint.clone());
+        }
+        Ok(())
+    }
+
+    async fn checkpoint(&self, market: &Pubkey) -> Result<Option<Checkpoint>> {
+        Ok(self
+            .checkpoints
+            .read()
+            .expect("store lock poisoned")
+            .get(market)
+            .cloned())
+    }
+
+    async fn checkpointed_markets(&self) -> Result<Vec<Pubkey>> {
+        Ok(self
+            .checkpoints
+            .read()
+            .expect("store lock poisoned")
+            .keys()
+            .copied()
+            .collect())
     }
 }
