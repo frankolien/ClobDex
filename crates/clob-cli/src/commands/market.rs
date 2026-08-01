@@ -4,16 +4,16 @@ use anyhow::{Context, Result};
 use clob_book::{LotConfig, Side};
 use clob_client::setup::{CreateMarketParams, TOKEN_ACCOUNT_LEN, create_market};
 use clob_client::state::MarketState;
+use clob_ops::config::write_keypair;
+use clob_ops::record::{MarketRecord, RECORD_DIR};
+use clob_ops::rpc::Client;
 use clob_program::state::SizeClass;
 use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_system_interface::instruction as system;
 
-use crate::config::write_keypair;
-use crate::rpc::Client;
 use crate::spl::{self, MINT_LEN};
-use crate::store::{MarketRecord, STORE_DIR};
 
 /// A SOL/USDC-shaped market: 9-decimal base, 6-decimal quote.
 ///
@@ -125,7 +125,7 @@ pub fn create(client: &Client, cluster: &str, taker_fee_bps: u64) -> Result<()> 
     // happened — but they are worth keeping to identify the tokens later.
     for (name, keypair) in [("base-mint", &base_mint), ("quote-mint", &quote_mint)] {
         write_keypair(
-            &std::path::Path::new(STORE_DIR).join(format!("{cluster}-{name}.json")),
+            &std::path::Path::new(RECORD_DIR).join(format!("{cluster}-{name}.json")),
             keypair,
         )?;
     }

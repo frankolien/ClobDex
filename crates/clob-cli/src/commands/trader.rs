@@ -6,17 +6,17 @@
 //! test data for anything that reads a tape.
 
 use anyhow::{Result, bail};
+use clob_client::instruction::TOKEN_PROGRAM_ID;
+use clob_client::setup::TOKEN_ACCOUNT_LEN;
+use clob_ops::config::write_keypair;
+use clob_ops::record::{MarketRecord, TraderRecord};
+use clob_ops::rpc::Client;
 use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_system_interface::instruction as system;
 
-use crate::config::write_keypair;
-use crate::rpc::Client;
 use crate::spl;
-use crate::store::{MarketRecord, TraderRecord};
-use clob_client::instruction::TOKEN_PROGRAM_ID;
-use clob_client::setup::TOKEN_ACCOUNT_LEN;
 
 /// SOL transferred to a new trader, enough for a few hundred transactions.
 const FUNDING_LAMPORTS: u64 = 100_000_000;

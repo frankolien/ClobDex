@@ -16,6 +16,7 @@ publish = false
 clob-book = { path = "../clob-book" }
 clob-client = { path = "../clob-client" }
 clob-engine = { path = "../clob-engine" }
+clob-ops = { path = "../clob-ops" }
 clob-program = { path = "../../programs/clob" }
 
 anyhow = "1"
@@ -23,13 +24,8 @@ clap = { version = "4", features = ["derive"] }
 spl-token = { version = "9", features = ["no-entrypoint"] }
 
 solana-instruction = "3"
-solana-client = "4"
-solana-commitment-config = "3"
 solana-keypair = "3"
 solana-program-pack = "3"
 solana-pubkey = "4"
 solana-signer = "3"
 solana-system-interface = { version = "3", features = ["bincode"] }
-serde_json = "1.0.151"
-serde = { version = "1.0.229", features = ["derive"] }
-solana-transaction = { version = "3", features = ["bincode"] }

@@ -3,9 +3,8 @@
 use anyhow::Result;
 use clob_book::{BaseLots, QuoteLots, Side, Ticks};
 use clob_client::instruction::{self, Receipt};
-
-use crate::rpc::Client;
-use crate::store::MarketRecord;
+use clob_ops::record::MarketRecord;
+use clob_ops::rpc::Client;
 
 /// Claims a seat and deposits funds in one transaction.
 ///

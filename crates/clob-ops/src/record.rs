@@ -4,6 +4,10 @@
 //! later command needs them. Rather than making the user paste six pubkeys per call,
 //! they are written to `.clob/<cluster>.json` and read back by default.
 //!
+//! This file is the contract between the tool that creates a market and every tool that
+//! trades on it, which is why it lives here rather than in whichever one happened to
+//! write it first. Two copies of these field names would be two things to keep in step.
+//!
 //! Addresses only. The mint authority keypair is written beside it as a normal Solana
 //! keypair file, because that one is a secret and does not belong in a document people
 //! copy around.
@@ -17,9 +21,9 @@ use serde::{Deserialize, Serialize};
 use solana_pubkey::Pubkey;
 
 /// Directory holding created-market records. Gitignored.
-pub const STORE_DIR: &str = ".clob";
+pub const RECORD_DIR: &str = ".clob";
 
-/// A market this CLI created, and everything needed to use it again.
+/// A market `create-market` created, and everything needed to use it again.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MarketRecord {
     /// The deployed program.
@@ -64,7 +68,7 @@ pub struct TraderRecord {
 impl TraderRecord {
     /// Where this trader's keypair is kept.
     pub fn keypair_path(cluster: &str, name: &str) -> PathBuf {
-        Path::new(STORE_DIR).join(format!("{cluster}-trader-{name}.json"))
+        Path::new(RECORD_DIR).join(format!("{cluster}-trader-{name}.json"))
     }
 
     /// Its two token accounts, in the order the builders take them.
@@ -76,13 +80,13 @@ impl TraderRecord {
 impl MarketRecord {
     /// Path for a cluster's record, e.g. `.clob/devnet.json`.
     pub fn path(cluster: &str) -> PathBuf {
-        Path::new(STORE_DIR).join(format!("{cluster}.json"))
+        Path::new(RECORD_DIR).join(format!("{cluster}.json"))
     }
 
     /// Writes the record, creating the directory if needed.
     pub fn save(&self, cluster: &str) -> Result<PathBuf> {
         let path = Self::path(cluster);
-        std::fs::create_dir_all(STORE_DIR)?;
+        std::fs::create_dir_all(RECORD_DIR)?;
         std::fs::write(&path, serde_json::to_string_pretty(self)?)
             .with_context(|| format!("cannot write {}", path.display()))?;
         Ok(path)

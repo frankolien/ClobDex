@@ -6,17 +6,13 @@
 //! here, so using this tool also exercises the SDK.
 
 mod commands;
-mod config;
-mod rpc;
 mod spl;
-mod store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use clob_book::Side;
-
-use crate::config::Config;
-use crate::rpc::Client;
+use clob_ops::record::TraderRecord;
+use clob_ops::{Client, Config};
 
 #[derive(Parser)]
 #[command(name = "clob", about = "Devnet operations for a ClobDex market", version)]
@@ -130,7 +126,7 @@ fn main() -> Result<()> {
     // holds the mint authority and the SOL.
     let keypair = match (as_trader, &cli.command) {
         (Some(name), command) if !matches!(command, Command::NewTrader { .. }) => {
-            Some(store::TraderRecord::keypair_path(cluster, name))
+            Some(TraderRecord::keypair_path(cluster, name))
         }
         _ => cli.keypair.clone(),
     };
