@@ -17,7 +17,7 @@ use clob_program::state::{
 };
 use clob_stream::correlate::{Correlator, PENDING_CAPACITY};
 use clob_stream::pipeline::{self, Outcome};
-use clob_stream::source::{RawInstruction, Source, Update};
+use clob_stream::source::{RawInstruction, SlotStatus, Source, Update};
 use solana_pubkey::Pubkey;
 
 type TestMarket = Market<128, 128, 32>;
@@ -106,6 +106,10 @@ fn order_instruction(trader: Pubkey, packet: &OrderPacket) -> RawInstruction {
 
 fn signature(byte: u8) -> [u8; 64] {
     [byte; 64]
+}
+
+fn slot_update(slot: u64, status: SlotStatus) -> Update {
+    Update::Slot { slot, status }
 }
 
 /// Runs a taker order and returns (before, after, instruction, what really happened).
@@ -360,17 +364,17 @@ fn the_tip_advances_on_every_kind_of_update() {
     // Slot updates are the only thing that arrives while no market is trading, and
     // without them the stream looks stalled.
     let mut correlator = Correlator::new();
-    correlator.accept(Update::Slot { slot: 42 });
+    correlator.accept(slot_update(42, SlotStatus::Confirmed));
     assert_eq!(correlator.tip(), 42);
 
-    correlator.accept(Update::Slot { slot: 41 });
+    correlator.accept(slot_update(41, SlotStatus::Confirmed));
     assert_eq!(correlator.tip(), 42, "the tip never goes backwards");
 }
 
 #[tokio::test]
 async fn a_replay_source_drives_the_correlator() {
     let mut source = clob_stream::source::Replay::new([
-        Update::Slot { slot: 1 },
+        slot_update(1, SlotStatus::Confirmed),
         Update::Account {
             slot: 1,
             market: MARKET,

@@ -15,6 +15,7 @@
 use anyhow::{Context, Result};
 use futures::{Stream, StreamExt};
 use helius_laserstream::grpc::{
+    SlotStatus as ProtoSlotStatus,
     CommitmentLevel, SubscribeRequest, SubscribeRequestFilterAccounts,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions, SubscribeUpdate,
     subscribe_update::UpdateOneof,
@@ -24,7 +25,7 @@ use solana_pubkey::Pubkey;
 use std::collections::HashMap;
 use std::pin::Pin;
 
-use crate::source::{RawInstruction, Source, Update};
+use crate::source::{RawInstruction, SlotStatus, Source, Update};
 
 /// A live subscription to one program's markets.
 pub struct LaserStream {
@@ -78,7 +79,15 @@ impl LaserStream {
             )]),
             // Slot updates keep the tip moving while no market is trading, so a quiet
             // market is distinguishable from a stalled stream.
-            slots: HashMap::from([("tip".to_string(), SubscribeRequestFilterSlots::default())]),
+            // Dead slots are the reason this subscription exists: indexing at confirmed
+            // publishes trades that can still be rolled back.
+            slots: HashMap::from([(
+                "tip".to_string(),
+                SubscribeRequestFilterSlots {
+                    filter_by_commitment: Some(false),
+                    ..Default::default()
+                },
+            )]),
             commitment: Some(commitment as i32),
             ..Default::default()
         };
@@ -147,7 +156,17 @@ fn convert(update: SubscribeUpdate) -> Option<Update> {
                     .collect(),
             })
         }
-        UpdateOneof::Slot(slot) => Some(Update::Slot { slot: slot.slot }),
+        UpdateOneof::Slot(slot) => Some(Update::Slot {
+            slot: slot.slot,
+            // The rest describe a slot's progress through block production, which says
+            // nothing about whether its writes will survive.
+            status: match ProtoSlotStatus::try_from(slot.status).ok()? {
+                ProtoSlotStatus::SlotConfirmed => SlotStatus::Confirmed,
+                ProtoSlotStatus::SlotFinalized => SlotStatus::Finalized,
+                ProtoSlotStatus::SlotDead => SlotStatus::Dead,
+                _ => return None,
+            },
+        }),
         _ => None,
     }
 }
@@ -184,12 +203,19 @@ mod tests {
             update_oneof: Some(UpdateOneof::Slot(
                 helius_laserstream::grpc::SubscribeUpdateSlot {
                     slot: 99,
+                    status: ProtoSlotStatus::SlotConfirmed as i32,
                     ..Default::default()
                 },
             )),
             ..Default::default()
         };
-        assert_eq!(convert(update), Some(Update::Slot { slot: 99 }));
+        assert_eq!(
+            convert(update),
+            Some(Update::Slot {
+                slot: 99,
+                status: SlotStatus::Confirmed
+            })
+        );
     }
 
     #[test]

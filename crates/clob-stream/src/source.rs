@@ -40,12 +40,31 @@ pub enum Update {
         /// Its instructions addressed to this program, in order.
         instructions: Vec<RawInstruction>,
     },
-    /// A slot reached a commitment level. Used to know how far the stream has advanced
-    /// even while no market is trading.
+    /// A slot changed status.
+    ///
+    /// Carries how far the stream has advanced even while no market is trading, and —
+    /// more importantly — whether a slot survived. Indexing at `confirmed` publishes
+    /// trades that can still be rolled back, so a dropped slot has to be retractable.
     Slot {
         /// The slot.
         slot: u64,
+        /// What became of it.
+        status: SlotStatus,
     },
+}
+
+/// How settled a slot is.
+///
+/// Only three of the cluster's statuses matter here. The rest describe a slot's progress
+/// through block production, which says nothing about whether its writes will survive.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SlotStatus {
+    /// Voted on by a supermajority. Its writes are visible and can still be rolled back.
+    Confirmed,
+    /// Rooted. Its writes are permanent.
+    Finalized,
+    /// Abandoned. Anything derived from it never happened and must be retracted.
+    Dead,
 }
 
 /// One instruction, with the accounts it names already resolved to addresses.

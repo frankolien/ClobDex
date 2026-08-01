@@ -15,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 
 use solana_pubkey::Pubkey;
 
-use crate::source::{RawInstruction, Update};
+use crate::source::{RawInstruction, SlotStatus, Update};
 
 /// How many unmatched halves to hold before dropping the oldest.
 ///
@@ -85,8 +85,12 @@ impl Correlator {
     /// Feeds one update in, and gets back a change when a pair completes.
     pub fn accept(&mut self, update: Update) -> Option<Change> {
         match update {
-            Update::Slot { slot } => {
-                self.tip = self.tip.max(slot);
+            Update::Slot { slot, status } => {
+                // A dead slot never advances the tip: nothing it wrote survived, so
+                // treating it as progress would claim coverage the stream does not have.
+                if status != SlotStatus::Dead {
+                    self.tip = self.tip.max(slot);
+                }
                 None
             }
             Update::Account {
