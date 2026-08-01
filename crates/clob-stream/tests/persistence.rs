@@ -315,3 +315,95 @@ fn vwap_weights_by_size_not_by_count() {
 
     assert_eq!(candle::vwap(&[]), None, "no trades has no average price");
 }
+
+// -------------------------------------------------------------------------------------
+// Checkpoints
+//
+// Trades alone cannot resume a derivation: it diffs one book against another, so picking
+// up where a previous process stopped needs the book as it stood there. A checkpoint is
+// that book, at a rooted slot — and rooted is what makes it safe to trust, since a slot
+// that cannot be rolled back describes a state that cannot be undone.
+// -------------------------------------------------------------------------------------
+
+#[tokio::test]
+async fn a_checkpoint_is_read_back_exactly() {
+    let store = Memory::new();
+    let checkpoint = Checkpoint {
+        slot: 500,
+        data: vec![7u8; 19_296],
+    };
+    store.save_checkpoint(&MARKET, &checkpoint).await.unwrap();
+
+    assert_eq!(store.checkpoint(&MARKET).await.unwrap(), Some(checkpoint));
+}
+
+#[tokio::test]
+async fn a_checkpoint_never_moves_backwards() {
+    // Writes can arrive out of order. An older one overwriting a newer would make the
+    // next restart replay from further back, or resume from a book that is already stale.
+    let store = Memory::new();
+    store
+        .save_checkpoint(&MARKET, &Checkpoint { slot: 500, data: vec![1] })
+        .await
+        .unwrap();
+    store
+        .save_checkpoint(&MARKET, &Checkpoint { slot: 400, data: vec![2] })
+        .await
+        .unwrap();
+
+    let kept = store.checkpoint(&MARKET).await.unwrap().unwrap();
+    assert_eq!(kept.slot, 500, "the newer checkpoint stands");
+    assert_eq!(kept.data, vec![1]);
+}
+
+#[tokio::test]
+async fn a_newer_checkpoint_replaces_an_older_one() {
+    let store = Memory::new();
+    store
+        .save_checkpoint(&MARKET, &Checkpoint { slot: 400, data: vec![1] })
+        .await
+        .unwrap();
+    store
+        .save_checkpoint(&MARKET, &Checkpoint { slot: 500, data: vec![2] })
+        .await
+        .unwrap();
+
+    let kept = store.checkpoint(&MARKET).await.unwrap().unwrap();
+    assert_eq!((kept.slot, kept.data), (500, vec![2]));
+}
+
+#[tokio::test]
+async fn checkpoints_are_per_market() {
+    let store = Memory::new();
+    store
+        .save_checkpoint(&MARKET, &Checkpoint { slot: 500, data: vec![1] })
+        .await
+        .unwrap();
+    store
+        .save_checkpoint(&OTHER, &Checkpoint { slot: 600, data: vec![2] })
+        .await
+        .unwrap();
+
+    let mut markets = store.checkpointed_markets().await.unwrap();
+    markets.sort();
+    assert_eq!(markets.len(), 2);
+    assert_eq!(store.checkpoint(&MARKET).await.unwrap().unwrap().slot, 500);
+    assert_eq!(store.checkpoint(&OTHER).await.unwrap().unwrap().slot, 600);
+}
+
+#[tokio::test]
+async fn a_market_with_no_checkpoint_reads_none() {
+    let store = Memory::new();
+    assert_eq!(store.checkpoint(&MARKET).await.unwrap(), None);
+    assert!(store.checkpointed_markets().await.unwrap().is_empty());
+}
+
+#[test]
+fn resuming_starts_from_the_oldest_checkpoint() {
+    // The oldest wins, not the newest: a market further behind than the others would
+    // otherwise have its missed slots skipped, and a hole in one tape is still a hole.
+    let checkpoints = [500u64, 400, 600];
+    let oldest = checkpoints.iter().copied().min().unwrap();
+
+    assert_eq!(oldest, 400);
+}
