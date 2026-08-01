@@ -55,13 +55,14 @@ const TRADERS: usize = 3;
 /// accounting bug hides in.
 const TAKER_FEE_BPS: u64 = 5;
 
-/// Sequences per case when nothing says otherwise.
+/// Longest sequence the generator will produce.
 ///
-/// Enough to build a real book and trade against it, small enough to belong in the
-/// ordinary test run. `PROPTEST_CASES` overrides the number of sequences.
+/// This is what bounds book depth — a book only gets as deep as one sequence has time to
+/// build it — so it is the number to raise for deeper states, not the case count.
 const OPS_PER_CASE: usize = 150;
 
-/// Cases when `PROPTEST_CASES` is not set.
+/// Sequences run when `PROPTEST_CASES` is not set. Small enough to belong in the ordinary
+/// test run; `PROPTEST_CASES` is how a real campaign is scaled.
 const DEFAULT_CASES: u32 = 12;
 
 /// One instruction, before it knows which market it is for.
