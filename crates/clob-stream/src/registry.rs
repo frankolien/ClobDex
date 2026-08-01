@@ -38,6 +38,12 @@ pub struct MarketView {
     pub tape: Vec<Trade>,
     /// Trades seen since the process started.
     pub trades_seen: u64,
+    /// Every slot at or below this is rooted, so its trades can no longer be rolled back.
+    ///
+    /// A consumer that cannot tolerate a retraction should ignore anything above it.
+    pub finalized_through: u64,
+    /// Trades withdrawn because the slot that produced them was abandoned.
+    pub trades_retracted: u64,
     /// Deltas whose derived fees disagreed with the market's own counter.
     ///
     /// Non-zero means the derivation and the program disagree about what happened, which
@@ -45,10 +51,29 @@ pub struct MarketView {
     pub reconciliation_failures: u64,
 }
 
+/// Something a subscriber needs to know about.
+#[derive(Clone)]
+pub enum Event {
+    /// One transaction's effect on a market.
+    Change(Arc<Derived>),
+    /// Trades withdrawn because the slot that produced them was abandoned.
+    ///
+    /// Published rather than quietly dropped: a client that already showed a trade has
+    /// to be told it did not happen, and silence looks identical to a quiet market.
+    Retracted {
+        /// Which market.
+        market: Pubkey,
+        /// The slot that was dropped.
+        slot: u64,
+        /// How many trades went with it.
+        trades: usize,
+    },
+}
+
 /// Everything being tracked, shared between ingest and the API.
 pub struct Registry {
     markets: RwLock<HashMap<Pubkey, MarketView>>,
-    updates: broadcast::Sender<Arc<Derived>>,
+    updates: broadcast::Sender<Event>,
 }
 
 impl Registry {
@@ -72,6 +97,8 @@ impl Registry {
                     slot: derived.slot,
                     tape: Vec::new(),
                     trades_seen: 0,
+                    finalized_through: 0,
+                    trades_retracted: 0,
                     reconciliation_failures: 0,
                 });
 
@@ -89,7 +116,53 @@ impl Registry {
         }
 
         // Fails only when nobody is listening, which is the normal case.
-        let _ = self.updates.send(Arc::new(derived));
+        let _ = self.updates.send(Event::Change(Arc::new(derived)));
+    }
+
+    /// Records that every slot up to `slot` is rooted.
+    ///
+    /// Not broadcast. Slots finalize continuously, so a message per slot per subscriber
+    /// would be almost entirely noise; the number rides along on the snapshot and on
+    /// every change instead.
+    pub fn finalize(&self, slot: u64) {
+        let mut markets = self.markets.write().expect("registry lock poisoned");
+        for view in markets.values_mut() {
+            view.finalized_through = view.finalized_through.max(slot);
+        }
+    }
+
+    /// Withdraws every trade that came from an abandoned slot.
+    ///
+    /// Only the tape is corrected. Account state needs no rollback: the writes from a
+    /// dead slot were never real, and the next update from a live slot carries the true
+    /// state — so a stale book self-heals, while a phantom trade never would.
+    pub fn retract(&self, slot: u64) {
+        let retracted: Vec<(Pubkey, usize)> = {
+            let mut markets = self.markets.write().expect("registry lock poisoned");
+            markets
+                .iter_mut()
+                .filter_map(|(market, view)| {
+                    let before = view.tape.len();
+                    view.tape.retain(|trade| trade.slot != slot);
+                    let removed = before - view.tape.len();
+                    if removed == 0 {
+                        return None;
+                    }
+                    view.trades_retracted += removed as u64;
+                    // trades_seen counts what was published, and a retraction is not an
+                    // un-publishing — the two are reported separately rather than netted.
+                    Some((*market, removed))
+                })
+                .collect()
+        };
+
+        for (market, trades) in retracted {
+            let _ = self.updates.send(Event::Retracted {
+                market,
+                slot,
+                trades,
+            });
+        }
     }
 
     /// Seeds a market's state without recording any trades.
@@ -100,6 +173,8 @@ impl Registry {
             slot,
             tape: Vec::new(),
             trades_seen: 0,
+            finalized_through: 0,
+            trades_retracted: 0,
             reconciliation_failures: 0,
         });
     }
@@ -123,8 +198,8 @@ impl Registry {
             .collect()
     }
 
-    /// A live feed of derived changes.
-    pub fn subscribe(&self) -> broadcast::Receiver<Arc<Derived>> {
+    /// A live feed of changes and retractions.
+    pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.updates.subscribe()
     }
 }

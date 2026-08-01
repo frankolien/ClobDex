@@ -12,7 +12,7 @@ use solana_pubkey::Pubkey;
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::api::http;
-use crate::registry::Registry;
+use crate::registry::{Event, Registry};
 
 /// What the socket sends.
 #[derive(Serialize)]
@@ -96,7 +96,7 @@ pub async fn stream(
                     _ => {}
                 },
                 update = updates.recv() => match update {
-                    Ok(derived) => {
+                    Ok(Event::Change(derived)) => {
                         if derived.market != market {
                             continue;
                         }
@@ -113,6 +113,9 @@ pub async fn stream(
                         };
                         if send(&mut session, &message).await.is_err() { break }
                     }
+                    // Surfacing a retraction to the client comes with the rest of the
+                    // finality surface.
+                    Ok(Event::Retracted { .. }) => {}
                     Err(RecvError::Lagged(missed)) => {
                         if send(&mut session, &Message::Lagged { missed }).await.is_err() { break }
                     }
