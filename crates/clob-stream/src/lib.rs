@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod attribute;
+pub mod candle;
 pub mod correlate;
 pub mod laserstream;
 pub mod pipeline;
