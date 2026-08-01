@@ -29,6 +29,22 @@ one half is held until the other shows up.
 Both buffers are bounded and evicted oldest-first. A dropped pairing costs one missing
 delta, which the next snapshot corrects; an unbounded buffer costs the process.
 
+## Rollbacks
+
+Indexing at `confirmed` sees a trade about a slot sooner than `finalized` does, and
+accepts that the slot can still be abandoned.
+
+So every trade carries whether its slot is rooted, every snapshot carries how far
+finality has advanced, and an abandoned slot pushes a `retract` message. A consumer that
+cannot tolerate a retraction has the number it needs in order to wait.
+
+Only the tape is corrected. Account state needs no rollback — the writes from a dead slot
+were never real, and the next update from a live slot carries the true state. A stale
+book self-heals; a phantom trade never would.
+
+`trades_seen` and `trades_retracted` are reported separately rather than netted. Two
+published minus one retracted reads identically to one published and nothing wrong.
+
 ## Gap recovery
 
 LaserStream tracks the last slot it delivered and replays from there on reconnect. That
@@ -55,6 +71,10 @@ that is worth alerting on rather than serving quietly.
 Persistence. Everything is in memory, so a restart replays from the endpoint's tip and
 the tape starts empty. Candles, historical queries, and anything a database is for belong
 behind a writer this crate does not have.
+
+That also bounds rollback handling: a retraction can only correct a trade still held in
+memory. Once a slot has aged out of the tape, nothing here can take it back — which is
+another reason the store is the next thing to build.
 
 ## License
 

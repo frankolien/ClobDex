@@ -16,7 +16,7 @@ use clob_stream::correlate::Correlator;
 use clob_stream::laserstream::{self, LaserStream};
 use clob_stream::pipeline::{self, Outcome};
 use clob_stream::registry::Registry;
-use clob_stream::source::Source;
+use clob_stream::source::{SlotStatus, Source, Update};
 use solana_pubkey::Pubkey;
 
 fn main() -> Result<()> {
@@ -64,6 +64,19 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
     let mut correlator = Correlator::new();
 
     while let Some(update) = source.next().await {
+        // Slot status is acted on before correlation, because a dead slot has to reach
+        // the registry whether or not it produced a change worth pairing.
+        if let Update::Slot { slot, status } = &update {
+            match status {
+                SlotStatus::Finalized => registry.finalize(*slot),
+                SlotStatus::Dead => {
+                    println!("slot {slot} was abandoned — retracting its trades");
+                    registry.retract(*slot);
+                }
+                SlotStatus::Confirmed => {}
+            }
+        }
+
         let Some(change) = correlator.accept(update) else {
             continue;
         };

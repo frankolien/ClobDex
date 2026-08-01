@@ -33,6 +33,9 @@ pub struct Book {
     pub asks: Vec<Level>,
     /// Taker fee in basis points.
     pub taker_fee_bps: u64,
+    /// Everything at or below this slot is rooted. A book above it can still change if
+    /// the slot it came from is abandoned.
+    pub finalized_through: u64,
 }
 
 /// One trade, as served.
@@ -50,10 +53,16 @@ pub struct Trade {
     pub taker_side: &'static str,
     /// Seat that owned the resting order.
     pub maker_seat: u32,
+    /// Whether the slot this came from is rooted.
+    ///
+    /// Filled in by the caller, which knows how far finality has advanced; a trade on
+    /// its own does not. A consumer that cannot tolerate a retraction should wait.
+    pub finalized: bool,
 }
 
-impl From<&clob_indexer::Trade> for Trade {
-    fn from(trade: &clob_indexer::Trade) -> Self {
+impl Trade {
+    /// Renders a trade, marking it final if its slot is rooted.
+    pub(crate) fn new(trade: &clob_indexer::Trade, finalized_through: u64) -> Self {
         Self {
             slot: trade.slot,
             price_in_ticks: trade.price_in_ticks.as_u64(),
@@ -61,6 +70,7 @@ impl From<&clob_indexer::Trade> for Trade {
             quote_lots: trade.quote_lots.as_u64(),
             taker_side: side_name(trade.taker_side),
             maker_seat: trade.maker_seat,
+            finalized: trade.slot <= finalized_through,
         }
     }
 }
@@ -129,6 +139,7 @@ pub async fn book(
         bids: levels(Side::Bid),
         asks: levels(Side::Ask),
         taker_fee_bps: view.state.fees().taker_fee_bps,
+        finalized_through: view.finalized_through,
     })
 }
 
@@ -148,7 +159,10 @@ pub async fn trades(
 
     let limit = query.limit.unwrap_or(100).min(MAX_LIMIT);
     let start = view.tape.len().saturating_sub(limit);
-    let trades: Vec<Trade> = view.tape[start..].iter().map(Trade::from).collect();
+    let trades: Vec<Trade> = view.tape[start..]
+        .iter()
+        .map(|trade| Trade::new(trade, view.finalized_through))
+        .collect();
     HttpResponse::Ok().json(trades)
 }
 
@@ -157,6 +171,10 @@ pub async fn trades(
 struct Health {
     markets: usize,
     trades_seen: u64,
+    /// Trades withdrawn because the slot that produced them was abandoned. Expected to
+    /// be small and non-zero on a cluster indexed at confirmed; zero forever suggests
+    /// rollbacks are not being seen at all.
+    trades_retracted: u64,
     /// Deltas whose derived fees disagreed with the market's own counter. Non-zero means
     /// the derivation and the program disagree, which is worth alerting on rather than
     /// serving quietly.
@@ -174,6 +192,7 @@ pub async fn health(registry: web::Data<Registry>) -> impl Responder {
     let health = Health {
         markets: views.len(),
         trades_seen: views.iter().map(|v| v.trades_seen).sum(),
+        trades_retracted: views.iter().map(|v| v.trades_retracted).sum(),
         reconciliation_failures: views.iter().map(|v| v.reconciliation_failures).sum(),
     };
 
@@ -185,6 +204,10 @@ pub async fn health(registry: web::Data<Registry>) -> impl Responder {
 }
 
 /// Shared by the HTTP and WebSocket sides so both report a trade identically.
-pub(crate) fn trades_of(delta: &clob_indexer::BookDelta) -> Vec<Trade> {
-    delta.trades.iter().map(Trade::from).collect()
+pub(crate) fn trades_of(delta: &clob_indexer::BookDelta, finalized_through: u64) -> Vec<Trade> {
+    delta
+        .trades
+        .iter()
+        .map(|trade| Trade::new(trade, finalized_through))
+        .collect()
 }

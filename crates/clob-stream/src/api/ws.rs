@@ -22,6 +22,8 @@ enum Message {
     Snapshot {
         market: String,
         slot: u64,
+        /// Everything at or below this slot is rooted.
+        finalized_through: u64,
         bids: Vec<http::Level>,
         asks: Vec<http::Level>,
     },
@@ -32,7 +34,15 @@ enum Message {
         /// Best bid and ask after it, when either side has liquidity.
         best_bid: Option<u64>,
         best_ask: Option<u64>,
+        /// Everything at or below this slot is rooted. Anything above it can still be
+        /// retracted, which is what a consumer needs in order to decide whether to act.
+        finalized_through: u64,
     },
+    /// Trades already sent that did not happen: their slot was abandoned.
+    ///
+    /// A client that showed them has to be told. Silence is indistinguishable from a
+    /// quiet market, so the correction is pushed rather than left to be noticed.
+    Retract { slot: u64, trades: usize },
     /// The subscriber fell too far behind and lost `missed` messages.
     ///
     /// Sent rather than silently skipping, because a gap a client does not know about is
@@ -76,6 +86,7 @@ pub async fn stream(
             let snapshot = Message::Snapshot {
                 market: market.to_string(),
                 slot: view.slot,
+                finalized_through: view.finalized_through,
                 bids: levels(clob_book::Side::Bid),
                 asks: levels(clob_book::Side::Ask),
             };
@@ -105,17 +116,26 @@ pub async fn stream(
                         if derived.delta.is_empty() {
                             continue;
                         }
+                        let finalized_through = registry
+                            .market(&market)
+                            .map(|view| view.finalized_through)
+                            .unwrap_or(0);
                         let message = Message::Update {
                             slot: derived.slot,
-                            trades: http::trades_of(&derived.delta),
+                            trades: http::trades_of(&derived.delta, finalized_through),
                             best_bid: derived.state.best_bid().map(|o| o.price_in_ticks().as_u64()),
                             best_ask: derived.state.best_ask().map(|o| o.price_in_ticks().as_u64()),
+                            finalized_through,
                         };
                         if send(&mut session, &message).await.is_err() { break }
                     }
-                    // Surfacing a retraction to the client comes with the rest of the
-                    // finality surface.
-                    Ok(Event::Retracted { .. }) => {}
+                    Ok(Event::Retracted { market: which, slot, trades }) => {
+                        if which != market {
+                            continue;
+                        }
+                        let message = Message::Retract { slot, trades };
+                        if send(&mut session, &message).await.is_err() { break }
+                    }
                     Err(RecvError::Lagged(missed)) => {
                         if send(&mut session, &Message::Lagged { missed }).await.is_err() { break }
                     }
