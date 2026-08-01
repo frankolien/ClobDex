@@ -42,6 +42,13 @@ pub struct Endpoint {
     pub program_id: Pubkey,
     /// `confirmed` indexes about a slot sooner; `finalized` cannot be rolled back.
     pub finalized: bool,
+    /// Replay from this slot instead of starting at the tip.
+    ///
+    /// How a restart picks up where it stopped: the same pipeline runs over the missed
+    /// slots, so backfill needs no second derivation path. Bounded by whatever history
+    /// the endpoint retains — beyond that the stream starts wherever it can, and the
+    /// caller is told the gap exists rather than left to infer it from a quiet tape.
+    pub from_slot: Option<u64>,
 }
 
 impl LaserStream {
@@ -89,6 +96,7 @@ impl LaserStream {
                 },
             )]),
             commitment: Some(commitment as i32),
+            from_slot: endpoint.from_slot,
             ..Default::default()
         };
 
@@ -190,6 +198,7 @@ pub fn endpoint_from_env(program_id: Pubkey) -> Result<Endpoint> {
         token: std::env::var("LASERSTREAM_TOKEN").context("LASERSTREAM_TOKEN is not set")?,
         program_id,
         finalized: std::env::var("COMMITMENT").as_deref() == Ok("finalized"),
+        from_slot: None,
     })
 }
 

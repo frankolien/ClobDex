@@ -79,6 +79,19 @@ impl Correlator {
         self.latest.get(market).map(Vec::as_slice)
     }
 
+    /// The slot a market's state is known good at.
+    ///
+    /// Checkpointing needs this: the bytes alone say nothing about when they were true,
+    /// and a checkpoint labelled with the wrong slot resumes from the wrong place.
+    pub fn known_at(&self, market: &Pubkey) -> Option<u64> {
+        self.known_at.get(market).copied()
+    }
+
+    /// Every market with a known state.
+    pub fn markets(&self) -> Vec<Pubkey> {
+        self.latest.keys().copied().collect()
+    }
+
     /// Seeds a market's state without producing a change.
     ///
     /// Used for snapshot updates the cluster sends without attributing them to a
