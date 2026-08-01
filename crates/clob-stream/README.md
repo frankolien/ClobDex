@@ -45,6 +45,17 @@ book self-heals; a phantom trade never would.
 `trades_seen` and `trades_retracted` are reported separately rather than netted. Two
 published minus one retracted reads identically to one published and nothing wrong.
 
+## Cold starts
+
+A market's first update can only establish a baseline — deriving from it would mean
+reporting the whole resting book as newly posted. So on startup every market is fetched
+over RPC first, and the first transaction observed after that is already derivable.
+
+Subscribe first, then snapshot. The other order leaves a window in which a transaction
+lands between the two and is never seen. Updates older than the snapshot slot are then
+ignored, since one still in flight from before it would replace a newer baseline with an
+older one.
+
 ## Gap recovery
 
 LaserStream tracks the last slot it delivered and replays from there on reconnect. That
@@ -75,6 +86,9 @@ behind a writer this crate does not have.
 That also bounds rollback handling: a retraction can only correct a trade still held in
 memory. Once a slot has aged out of the tape, nothing here can take it back — which is
 another reason the store is the next thing to build.
+
+The startup snapshot restores current state but not history, so the tape still begins
+empty on every restart.
 
 ## License
 
