@@ -7,7 +7,7 @@ members = ["crates/clob-book", "crates/clob-client", "crates/clob-engine", "crat
 # needing wincode 0.5) and solana-client (needing wincode 0.6) would have to agree, and
 # they cannot. An on-chain program and an RPC client tool have no reason to share a
 # lockfile; keeping them apart is what lets each pick the versions it actually needs.
-exclude = ["crates/clob-cli"]
+exclude = ["crates/clob-cli", "crates/clob-stream"]
 
 [workspace.package]
 edition = "2024"

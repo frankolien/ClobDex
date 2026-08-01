@@ -1,0 +1,33 @@
+# Its own workspace — see the `exclude` note in the root Cargo.toml.
+[workspace]
+
+[package]
+name = "clob-stream"
+version = "0.1.0"
+description = "Streams ClobDex markets from a Yellowstone endpoint and serves the derived tape."
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ClobDex/clobdex"
+# Higher than the rest of the repo: actix-web 4.14 needs 1.88. The on-chain crates
+# hold 1.85 because platform-tools pins their compiler; a service binary has no such
+# constraint.
+rust-version = "1.88"
+readme = "README.md"
+publish = false
+
+[dependencies]
+clob-book = { path = "../clob-book" }
+clob-client = { path = "../clob-client" }
+clob-indexer = { path = "../clob-indexer" }
+
+anyhow = "1"
+solana-pubkey = "4"
+helius-laserstream = "0.5.0"
+actix-web = "4.14"
+actix-ws = "0.4"
+tokio = { version = "1.53.1", features = ["full"] }
+clob-engine = { version = "0.1.0", path = "../clob-engine" }
+
+[dev-dependencies]
+bytemuck = "1.25.2"
+clob-program = { path = "../../programs/clob" }
