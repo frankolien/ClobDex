@@ -57,6 +57,7 @@ fn trade(slot: u64, price: u64) -> Trade {
         quote_lots: QuoteLots(price * 10),
         maker_order_id: clob_book::FIFOOrderId::new(Side::Ask, Ticks(price), slot),
         maker_seat: 1,
+        taker_seat: Some(2),
         taker_side: Side::Bid,
     }
 }

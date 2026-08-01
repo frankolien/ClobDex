@@ -25,6 +25,7 @@ fn trade(price: u64, size: u64) -> Trade {
         quote_lots: QuoteLots(price * size),
         maker_order_id: FIFOOrderId::new(Side::Ask, Ticks(price), 1),
         maker_seat: 1,
+        taker_seat: Some(2),
         taker_side: Side::Bid,
     }
 }
@@ -38,6 +39,7 @@ fn stored(slot: u64, price: u64, size: u64) -> StoredTrade {
         base_lots: size,
         quote_lots: price * size,
         maker_seat: 1,
+        taker_seat: Some(2),
         maker_order_sequence: slot,
         taker_side_is_bid: true,
     }

@@ -63,6 +63,8 @@ pub struct Trade {
     pub taker_side: &'static str,
     /// Seat that owned the resting order.
     pub maker_seat: u32,
+    /// Seat that crossed it, when the derivation could say which. `null` otherwise.
+    pub taker_seat: Option<u32>,
     /// Whether the slot this came from is rooted.
     ///
     /// A trade cannot know this on its own; the caller supplies how far finality has
@@ -80,6 +82,7 @@ impl Trade {
             quote_lots: trade.quote_lots.as_u64(),
             taker_side: side_name(trade.taker_side),
             maker_seat: trade.maker_seat,
+            taker_seat: trade.taker_seat,
             finalized: trade.slot <= finalized_through,
         }
     }
@@ -212,6 +215,8 @@ pub struct HistoricalTrade {
     pub taker_side: &'static str,
     /// Seat that owned the resting order.
     pub maker_seat: u32,
+    /// Seat that crossed it, when the derivation could say which. `null` otherwise.
+    pub taker_seat: Option<u32>,
 }
 
 impl From<&crate::store::StoredTrade> for HistoricalTrade {
@@ -227,6 +232,7 @@ impl From<&crate::store::StoredTrade> for HistoricalTrade {
                 false => "ask",
             },
             maker_seat: trade.maker_seat,
+            taker_seat: trade.taker_seat,
         }
     }
 }

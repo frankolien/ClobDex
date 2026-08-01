@@ -43,6 +43,10 @@ struct TradeRow {
     base_lots: u64,
     quote_lots: u64,
     maker_seat: u32,
+    /// Defaulted, so a file written before the column existed still loads — as
+    /// unattributed, which is exactly what it is.
+    #[serde(default)]
+    taker_seat: Option<u32>,
     maker_order_sequence: u64,
     taker_side_is_bid: bool,
 }
@@ -76,6 +80,7 @@ impl TradeRow {
             base_lots: trade.base_lots,
             quote_lots: trade.quote_lots,
             maker_seat: trade.maker_seat,
+            taker_seat: trade.taker_seat,
             maker_order_sequence: trade.maker_order_sequence,
             taker_side_is_bid: trade.taker_side_is_bid,
         }
@@ -93,6 +98,7 @@ impl TradeRow {
             base_lots: self.base_lots,
             quote_lots: self.quote_lots,
             maker_seat: self.maker_seat,
+            taker_seat: self.taker_seat,
             maker_order_sequence: self.maker_order_sequence,
             taker_side_is_bid: self.taker_side_is_bid,
         })
@@ -229,5 +235,48 @@ impl Store for Files {
 
     async fn checkpointed_markets(&self) -> Result<Vec<Pubkey>> {
         self.memory.checkpointed_markets().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(taker_seat: Option<u32>) -> TradeRow {
+        TradeRow::of(&StoredTrade {
+            market: Pubkey::new_from_array([3u8; 32]),
+            slot: 42,
+            signature: [7u8; 64],
+            price_in_ticks: 150_000,
+            base_lots: 25,
+            quote_lots: 3_750_000,
+            maker_seat: 4,
+            taker_seat,
+            maker_order_sequence: 991,
+            taker_side_is_bid: true,
+        })
+    }
+
+    #[test]
+    fn a_row_survives_a_round_trip_through_json() {
+        for seat in [Some(9), None] {
+            let text = serde_json::to_string(&row(seat)).unwrap();
+            let back: TradeRow = serde_json::from_str(&text).unwrap();
+            assert_eq!(back.into_trade().unwrap().taker_seat, seat, "for {seat:?}");
+        }
+    }
+
+    #[test]
+    fn a_line_written_before_the_column_existed_still_loads() {
+        // This store appends to one file forever, so every line ever written has to stay
+        // readable. Without a default, adding a column would make the whole tape
+        // unloadable at the next restart — and the failure would arrive at startup, long
+        // after the change that caused it.
+        let text = serde_json::to_string(&row(Some(9))).unwrap();
+        let mut fields: serde_json::Value = serde_json::from_str(&text).unwrap();
+        fields.as_object_mut().unwrap().remove("taker_seat");
+
+        let old: TradeRow = serde_json::from_value(fields).expect("an old line should load");
+        assert_eq!(old.into_trade().unwrap().taker_seat, None);
     }
 }

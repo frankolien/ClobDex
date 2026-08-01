@@ -68,10 +68,21 @@ impl ClickHouse {
                 base_lots    UInt64,
                 quote_lots   UInt64,
                 maker_seat   UInt32,
+                taker_seat   Nullable(UInt32),
                 maker_order  UInt64,
                 taker_is_bid UInt8
              ) ENGINE = ReplacingMergeTree()
              ORDER BY (market, slot, signature, maker_order)",
+            self.database
+        ))
+        .await?;
+
+        // `CREATE TABLE IF NOT EXISTS` leaves an existing table exactly as it was, so a
+        // column added after a deployment would never appear and every read would fail on
+        // the missing name. Stating the addition separately is what makes this a
+        // migration rather than a create; it is a no-op on a table that already has it.
+        self.execute(&format!(
+            "ALTER TABLE {}.{TABLE} ADD COLUMN IF NOT EXISTS taker_seat Nullable(UInt32) AFTER maker_seat",
             self.database
         ))
         .await?;
@@ -136,14 +147,17 @@ fn unhex(text: &str) -> Option<[u8; 64]> {
     Some(out)
 }
 
+/// How TabSeparated spells a null, and the only field here that is ever absent.
+const NULL: &str = "\\N";
+
 /// One row, tab-separated, as `INSERT ... FORMAT TabSeparated` expects.
 ///
-/// Every field is a number or a hex string, so nothing here can contain a tab or a
+/// Every field is a number, a hex string, or `\N`, so nothing here can contain a tab or a
 /// newline and no escaping is needed. That is a property of the schema, not luck — a
 /// `String` column taking arbitrary input would need quoting.
 fn row(trade: &StoredTrade) -> String {
     format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         trade.market,
         trade.slot,
         hex(&trade.signature),
@@ -151,6 +165,10 @@ fn row(trade: &StoredTrade) -> String {
         trade.base_lots,
         trade.quote_lots,
         trade.maker_seat,
+        trade
+            .taker_seat
+            .map(|seat| seat.to_string())
+            .unwrap_or_else(|| NULL.into()),
         trade.maker_order_sequence,
         u8::from(trade.taker_side_is_bid),
     )
@@ -178,7 +196,7 @@ impl Store for ClickHouse {
         let body = self
             .execute(&format!(
                 "SELECT market, slot, signature, price_in_ticks, base_lots, quote_lots,
-                        maker_seat, maker_order, taker_is_bid
+                        maker_seat, taker_seat, maker_order, taker_is_bid
                  FROM {}.{TABLE} FINAL
                  WHERE market = '{market}' AND slot >= {} AND slot <= {}
                  ORDER BY slot ASC
@@ -264,13 +282,21 @@ impl Store for ClickHouse {
 
 fn parse(line: &str) -> Result<StoredTrade> {
     let fields: Vec<&str> = line.split('\t').collect();
-    if fields.len() != 9 {
-        bail!("expected 9 columns, got {}: {line}", fields.len());
+    if fields.len() != 10 {
+        bail!("expected 10 columns, got {}: {line}", fields.len());
     }
     let number = |index: usize| -> Result<u64> {
         fields[index]
             .parse()
             .with_context(|| format!("column {index} was not a number: {}", fields[index]))
+    };
+
+    // The one nullable column. `\N` is absence, not a parse failure, so it must be tested
+    // for before parsing rather than recovered from afterwards — otherwise a genuinely
+    // malformed seat would also read as unattributed.
+    let taker_seat = match fields[7] {
+        NULL => None,
+        _ => Some(number(7)? as u32),
     };
 
     Ok(StoredTrade {
@@ -281,8 +307,9 @@ fn parse(line: &str) -> Result<StoredTrade> {
         base_lots: number(4)?,
         quote_lots: number(5)?,
         maker_seat: number(6)? as u32,
-        maker_order_sequence: number(7)?,
-        taker_side_is_bid: number(8)? != 0,
+        taker_seat,
+        maker_order_sequence: number(8)?,
+        taker_side_is_bid: number(9)? != 0,
     })
 }
 
@@ -299,6 +326,7 @@ mod tests {
             base_lots: 25,
             quote_lots: 3_750_000,
             maker_seat: 4,
+            taker_seat: Some(9),
             maker_order_sequence: 991,
             taker_side_is_bid: true,
         }
@@ -313,11 +341,33 @@ mod tests {
     }
 
     #[test]
+    fn an_unattributed_taker_survives_as_absent_rather_than_as_a_seat() {
+        // The one nullable column. Round-tripping it to `Some(0)` would silently file
+        // every unattributable fill under seat zero, which is a real trader.
+        let unattributed = StoredTrade {
+            taker_seat: None,
+            ..trade()
+        };
+        let encoded = row(&unattributed);
+        assert!(encoded.contains(NULL), "encoded as {encoded}");
+        assert_eq!(parse(&encoded).unwrap(), unattributed);
+        assert_eq!(parse(&encoded).unwrap().taker_seat, None);
+    }
+
+    #[test]
+    fn a_malformed_seat_is_an_error_rather_than_an_absence() {
+        // Only `\N` means absent. Recovering from a parse failure by returning `None`
+        // would turn corruption into a plausible-looking row.
+        let broken = row(&trade()).replace("\t9\t", "\tnine\t");
+        assert!(parse(&broken).is_err());
+    }
+
+    #[test]
     fn a_row_has_no_tabs_or_newlines_inside_its_fields() {
         // TabSeparated has no escaping, so a field containing a separator would silently
         // shift every column after it.
         let encoded = row(&trade());
-        assert_eq!(encoded.matches('\t').count(), 8);
+        assert_eq!(encoded.matches('\t').count(), 9);
         assert!(!encoded.contains('\n'));
     }
 

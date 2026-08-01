@@ -47,6 +47,13 @@ pub struct StoredTrade {
     pub quote_lots: u64,
     /// Seat that owned the resting order.
     pub maker_seat: u32,
+    /// Seat that crossed it, when the derivation could say which.
+    ///
+    /// Absent when several takers hit the same side in one transaction, or when the
+    /// submitter's seat did not resolve — see [`clob_indexer::Trade::taker_seat`]. Stored
+    /// rather than derived on read because it cannot be recovered from a row: the book
+    /// state that produced it is long gone by then.
+    pub taker_seat: Option<u32>,
     /// Sequence number of the resting order that was hit.
     ///
     /// The only field that distinguishes two fills of the same size, at the same price,
