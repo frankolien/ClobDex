@@ -1,0 +1,1 @@
+A crankless on-chain order book on Solana — post, cancel and fill in a single transaction with no crank, no oracle, and no custody: your funds sit in the market's vaults, your orders settle atomically inside the taker's transaction, and a market-maker refreshes an entire two-sided ladder for 4,639 compute units.
