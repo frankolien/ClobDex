@@ -6,6 +6,8 @@
 
 #![allow(dead_code)]
 
+pub mod world;
+
 use clob_book::{BaseLots, FIFOOrderId, LotConfig, QuoteLots, Side, Ticks};
 use clob_client::instruction::{self as sdk, MarketAddresses, Receipt};
 use clob_engine::{FeeSchedule, Market};
