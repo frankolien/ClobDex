@@ -174,6 +174,31 @@ fn row(trade: &StoredTrade) -> String {
     )
 }
 
+/// The query behind [`Store::trades`].
+///
+/// Two things here are load-bearing.
+///
+/// `FINAL` collapses duplicate rows at read time. Without it a replayed slot is counted
+/// twice until ClickHouse happens to merge the parts.
+///
+/// The limit is applied to a `DESC` inner query and the order restored outside it, so a
+/// bounded read keeps the *newest* rows. A plain `ORDER BY slot ASC LIMIT n` keeps the
+/// oldest, which answers "the last hundred trades" with the first hundred ever — and
+/// silently, since both return exactly `n` rows in ascending order.
+fn trades_query(database: &str, market: &Pubkey, range: Range) -> String {
+    format!(
+        "SELECT * FROM (
+             SELECT market, slot, signature, price_in_ticks, base_lots, quote_lots,
+                    maker_seat, taker_seat, maker_order, taker_is_bid
+             FROM {database}.{TABLE} FINAL
+             WHERE market = '{market}' AND slot >= {} AND slot <= {}
+             ORDER BY slot DESC
+             LIMIT {}
+         ) ORDER BY slot ASC FORMAT TabSeparated",
+        range.from_slot, range.to_slot, range.limit
+    )
+}
+
 #[async_trait::async_trait]
 impl Store for ClickHouse {
     async fn append(&self, trades: &[StoredTrade]) -> Result<()> {
@@ -191,20 +216,7 @@ impl Store for ClickHouse {
     }
 
     async fn trades(&self, market: &Pubkey, range: Range) -> Result<Vec<StoredTrade>> {
-        // FINAL collapses duplicate rows at read time. Without it a replayed slot would
-        // be counted twice until ClickHouse happened to merge the parts.
-        let body = self
-            .execute(&format!(
-                "SELECT market, slot, signature, price_in_ticks, base_lots, quote_lots,
-                        maker_seat, taker_seat, maker_order, taker_is_bid
-                 FROM {}.{TABLE} FINAL
-                 WHERE market = '{market}' AND slot >= {} AND slot <= {}
-                 ORDER BY slot ASC
-                 LIMIT {} FORMAT TabSeparated",
-                self.database, range.from_slot, range.to_slot, range.limit
-            ))
-            .await?;
-
+        let body = self.execute(&trades_query(&self.database, market, range)).await?;
         body.lines().filter(|line| !line.is_empty()).map(parse).collect()
     }
 
@@ -360,6 +372,27 @@ mod tests {
         // would turn corruption into a plausible-looking row.
         let broken = row(&trade()).replace("\t9\t", "\tnine\t");
         assert!(parse(&broken).is_err());
+    }
+
+    #[test]
+    fn a_bounded_read_asks_for_the_newest_rows() {
+        // Pins the shape of the query, not the behaviour of the server — only a live
+        // ClickHouse proves the latter, and there isn't one in a unit test. It is still
+        // worth having: the difference between keeping the newest and the oldest rows is
+        // one word, both spellings return `limit` rows in ascending order, and the wrong
+        // one shows a stale tape rather than an error.
+        let sql = trades_query(
+            "clob",
+            &Pubkey::new_from_array([3u8; 32]),
+            Range::latest(100),
+        );
+        let inner = sql.find("ORDER BY slot DESC").expect("inner order is descending");
+        let outer = sql.rfind("ORDER BY slot ASC").expect("outer order is ascending");
+        let limit = sql.find("LIMIT 100").expect("the limit is applied");
+
+        assert!(inner < limit, "the limit must apply to the descending order");
+        assert!(limit < outer, "and the ascending order must be restored after it");
+        assert!(sql.contains("FINAL"), "duplicates must collapse at read time");
     }
 
     #[test]

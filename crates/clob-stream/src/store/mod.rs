@@ -115,6 +115,12 @@ pub trait Store: Send + Sync {
     async fn append(&self, trades: &[StoredTrade]) -> Result<()>;
 
     /// Reads trades for one market, oldest first.
+    ///
+    /// When more trades match than `range.limit`, the **most recent** are kept and then
+    /// returned in ascending order. Stated here rather than left to each backend: both
+    /// ends of the range return exactly `limit` rows in ascending order, so an
+    /// implementation that took the oldest would answer "the last hundred trades" with
+    /// the first hundred ever and look completely correct doing it.
     async fn trades(&self, market: &Pubkey, range: Range) -> Result<Vec<StoredTrade>>;
 
     /// The highest slot written for a market, if any.
