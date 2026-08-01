@@ -68,6 +68,7 @@ fn discriminant_of(instruction: &decode::ClobInstruction) -> clob_program::instr
         I::LogEvent => D::LogEvent,
         I::Swap { .. } => D::Swap,
         I::EvictSeat => D::EvictSeat,
+        I::BatchUpdate { .. } => D::BatchUpdate,
     }
 }
 
@@ -87,14 +88,14 @@ fn an_event_claiming_more_fills_than_it_carries_is_refused() {
 fn every_defined_discriminant_is_reachable() {
     // A tag the SDK cannot decode is an instruction an observer would silently drop, so
     // the two lists have to stay the same length.
-    for tag in 0u8..12 {
+    for tag in 0u8..13 {
         assert!(
             clob_program::instruction::Discriminant::parse(tag).is_ok(),
             "tag {tag} is not a known discriminant"
         );
     }
     assert!(
-        clob_program::instruction::Discriminant::parse(12).is_err(),
-        "12 must not be a discriminant — add it here when it becomes one"
+        clob_program::instruction::Discriminant::parse(13).is_err(),
+        "13 must not be a discriminant — add it here when it becomes one"
     );
 }

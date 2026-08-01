@@ -25,6 +25,7 @@ pub fn process(program_id: &Address, accounts: &mut [AccountView], data: &[u8]) 
         Discriminant::CollectFees => market::collect_fees(program_id, accounts),
         Discriminant::ClaimSeat => seat::claim(program_id, accounts),
         Discriminant::EvictSeat => seat::evict(program_id, accounts),
+        Discriminant::BatchUpdate => trade::batch_update(program_id, accounts, &mut reader),
         Discriminant::Deposit => seat::deposit(program_id, accounts, &mut reader),
         Discriminant::Withdraw => seat::withdraw(program_id, accounts, &mut reader),
         Discriminant::PlaceOrder => trade::place_order(program_id, accounts, &mut reader),

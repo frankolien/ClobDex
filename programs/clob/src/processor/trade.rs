@@ -198,3 +198,71 @@ pub(super) fn to_bytes(address: &Address) -> [u8; 32] {
     bytes.copy_from_slice(address.as_ref());
     bytes
 }
+
+/// Accounts: market, trader (signer).
+///
+/// # The market-maker cycle
+///
+/// Cancels run first, then places, because that is the order a maker needs: releasing
+/// the capital behind stale quotes is what funds the new ones. Doing it the other way
+/// would make a full ladder refresh fail on its own locked balance.
+///
+/// # A cancel that finds nothing is not an error
+///
+/// An order a maker is trying to replace may have been filled a moment earlier. That is
+/// the ordinary case, not a failure — and treating it as one would make a refresh revert
+/// exactly when a quote got hit, which is precisely when the maker most needs to replace
+/// it. Missing orders are skipped; an order belonging to someone else still fails.
+///
+/// # Placement is all-or-nothing
+///
+/// Any rejected order fails the whole instruction. A maker that half-placed a ladder
+/// would have to read the book back to discover what it actually owns, and the point of
+/// batching is to avoid that round trip.
+///
+/// # No receipt form
+///
+/// Deliberately. The receipt exists for takers and aggregators; a maker already knows
+/// what it submitted, and the event buffer describes one order rather than a batch.
+pub fn batch_update(
+    program_id: &Address,
+    accounts: &mut [AccountView],
+    reader: &mut Reader<'_>,
+) -> ProgramResult {
+    let (market_account, rest) = split_market(accounts)?;
+    expect_market_account(market_account, program_id)?;
+    let trader = at(rest, 0)?;
+    expect_signer(trader)?;
+
+    let key = TraderKey(to_bytes(trader.address()));
+    let mut data = market_account.try_borrow_mut()?;
+    let (header, market_bytes) = split_initialized(&mut data)?;
+    let size_class = SizeClass::from_u64(header.size_class)?;
+
+    // Read and apply in one pass rather than collecting first: the number of orders is
+    // caller-supplied, and a fixed buffer large enough for the worst case would not fit
+    // on a 4 KB stack.
+    dispatch_market!(size_class, market_bytes, |market| {
+        let seat = market.seat_index(&key);
+
+        let cancels = reader.u8()?;
+        for _ in 0..cancels {
+            let order_id = reader.order_id()?;
+            match market.cancel_order(seat, &order_id) {
+                Ok(_) => {}
+                // Already filled, or already cancelled. Both mean the maker's intent is
+                // satisfied: the order is not resting.
+                Err(clob_engine::EngineError::OrderNotFound) => {}
+                Err(error) => return Err(map_engine::<()>(Err(error)).unwrap_err()),
+            }
+        }
+
+        let orders = reader.u8()?;
+        let mut events = EventBuffer::new();
+        for _ in 0..orders {
+            let packet = reader.order_packet()?;
+            map_engine(market.place_order(seat, packet, &mut events))?;
+        }
+    });
+    Ok(())
+}

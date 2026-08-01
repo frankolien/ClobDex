@@ -88,6 +88,13 @@ pub enum ClobInstruction {
     },
     /// A permissionless seat eviction.
     EvictSeat,
+    /// Cancels and placements in one instruction.
+    BatchUpdate {
+        /// Orders cancelled, in order.
+        cancels: Vec<FIFOOrderId>,
+        /// Orders submitted, in order.
+        orders: Vec<OrderPacket>,
+    },
 }
 
 impl ClobInstruction {
@@ -99,13 +106,24 @@ impl ClobInstruction {
         match self {
             Self::PlaceOrder { packet, .. } if packet.can_take() => Some(packet.side()),
             Self::Swap { side, .. } => Some(*side),
+            // A batch is a taker if any order in it is. Reporting the first such side is
+            // enough for attribution: a batch crossing both sides at once would be a
+            // maker trading against itself, which the engine rejects before this matters.
+            Self::BatchUpdate { orders, .. } => orders
+                .iter()
+                .find(|packet| packet.can_take())
+                .map(|packet| packet.side()),
             _ => None,
         }
     }
 
     /// Whether this instruction can add liquidity to the book.
     pub fn can_post(&self) -> bool {
-        matches!(self, Self::PlaceOrder { packet, .. } if packet.can_post())
+        match self {
+            Self::PlaceOrder { packet, .. } => packet.can_post(),
+            Self::BatchUpdate { orders, .. } => orders.iter().any(OrderPacket::can_post),
+            _ => false,
+        }
     }
 }
 
@@ -208,5 +226,19 @@ pub fn decode(data: &[u8]) -> Result<ClobInstruction, InstructionDecodeError> {
             receipt: reader.optional_u8().is_some(),
         },
         Discriminant::EvictSeat => ClobInstruction::EvictSeat,
+        Discriminant::BatchUpdate => {
+            let cancel_count = read(reader.u8())?;
+            let mut cancels = Vec::with_capacity(cancel_count as usize);
+            for _ in 0..cancel_count {
+                cancels.push(read(reader.order_id())?);
+            }
+
+            let order_count = read(reader.u8())?;
+            let mut orders = Vec::with_capacity(order_count as usize);
+            for _ in 0..order_count {
+                orders.push(read(reader.order_packet())?);
+            }
+            ClobInstruction::BatchUpdate { cancels, orders }
+        }
     })
 }

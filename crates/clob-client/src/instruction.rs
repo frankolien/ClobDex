@@ -353,6 +353,48 @@ pub fn reduce_order(
     }
 }
 
+/// Cancels a set of orders and places a set of orders, in one instruction.
+///
+/// The market-maker cycle. Doing it as separate instructions means a transaction per
+/// quote update, and a maker refreshing a two-sided ladder does that continuously.
+///
+/// Cancels run first, because releasing the capital behind stale quotes is what funds
+/// the new ones. A cancel that finds nothing is not an error — the order was filled,
+/// which is the ordinary case rather than a failure. Placement is all-or-nothing.
+///
+/// There is no receipt form: the receipt exists for takers and aggregators, and a maker
+/// already knows what it submitted.
+///
+/// # Panics
+///
+/// Never. Counts above 255 are rejected by the caller's transaction size long before
+/// they reach this, and both lists are truncated to what a `u8` can express.
+pub fn batch_update(
+    addresses: &MarketAddresses,
+    trader: &Pubkey,
+    cancels: &[FIFOOrderId],
+    orders: &[OrderPacket],
+) -> Instruction {
+    let mut data = Data::new(Discriminant::BatchUpdate).u8(cancels.len().min(255) as u8);
+    for id in cancels.iter().take(255) {
+        data = data.order_id(id);
+    }
+
+    data = data.u8(orders.len().min(255) as u8);
+    for packet in orders.iter().take(255) {
+        data = data.packet(packet);
+    }
+
+    Instruction {
+        program_id: addresses.program_id,
+        accounts: vec![
+            AccountMeta::new(addresses.market, false),
+            AccountMeta::new_readonly(*trader, true),
+        ],
+        data: data.into_vec(),
+    }
+}
+
 /// Cancels up to `limit` of the caller's orders on one side.
 ///
 /// The bound is the caller's to set. An unbounded cancel-all on a deep book can exceed

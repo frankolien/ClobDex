@@ -47,6 +47,11 @@ pub enum Discriminant {
     Swap = 10,
     /// Return an empty seat to the market. Permissionless.
     EvictSeat = 11,
+    /// Cancel a set of orders and place a set of orders, in one instruction.
+    ///
+    /// The market-maker cycle. Doing it as separate instructions means a transaction per
+    /// quote update, and a maker refreshing a two-sided ladder does that continuously.
+    BatchUpdate = 12,
 }
 
 impl Discriminant {
@@ -69,6 +74,7 @@ impl Discriminant {
             9 => Ok(Self::LogEvent),
             10 => Ok(Self::Swap),
             11 => Ok(Self::EvictSeat),
+            12 => Ok(Self::BatchUpdate),
             _ => Err(ClobError::UnknownInstruction),
         }
     }
