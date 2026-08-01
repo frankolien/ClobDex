@@ -1,0 +1,6 @@
+# Netlify and Cloudflare Pages.
+#
+# Routing is client-side, so `/trade` and `/portfolio` are not files. Without this every
+# URL but `/` returns 404 on a static host — and only after deploying, since the dev
+# server falls back to index.html on its own and hides the problem completely.
+/*  /index.html  200

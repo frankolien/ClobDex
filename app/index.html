@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClobDex</title>
+    <meta name="description" content="Trade the ClobDex crankless order book." />
+
+    <!-- Dark by design rather than by preference, so no white frame paints first. -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#050607" />
+
+    <!-- A trading screen has nothing a crawler should index, and every URL here is a
+         wallet's view of a market rather than a public document. -->
+    <meta name="robots" content="noindex" />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234ade9b'/%3E%3Cpath d='M6 15h3v3H6zM6 10h3v3H6zM10.5 6h3v3h-3zM15 10h3v3h-3z' fill='%23050607'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

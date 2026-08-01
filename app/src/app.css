@@ -1,0 +1,447 @@
+/*
+ * Layout for the app's views.
+ *
+ * The tokens and primitives are in `styles.css`; this is arrangement only. Split so that
+ * changing how a ladder is laid out never risks changing what a colour means.
+ */
+
+.app {
+  display: grid;
+  grid-template-rows: var(--nav-h) 1fr;
+  height: 100%;
+}
+
+main {
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+/* --- Header ------------------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding-inline: 0.85rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.app-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-header nav {
+  display: flex;
+  gap: 0.15rem;
+  margin-right: auto;
+}
+
+.tab {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  color: var(--text-3);
+  transition:
+    color 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.on {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.app-header .right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The badge exists so nobody signs on the wrong network. Mainnet is the loud one — the
+   others are informational, and this one is a warning. */
+.cluster {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.cluster.mainnet {
+  border-color: rgb(239 125 99 / 0.5);
+  background: rgb(239 125 99 / 0.12);
+  color: var(--ask);
+}
+
+/* --- Shared ------------------------------------------------------------------- */
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-3);
+  max-width: 40rem;
+  margin-inline: auto;
+}
+
+.stale {
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(239 125 99 / 0.28);
+  border-radius: 7px;
+  background: rgb(239 125 99 / 0.08);
+  color: #f0b6a6;
+  font-size: 0.75rem;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.85rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.r {
+  text-align: right;
+}
+
+.empty {
+  padding: 1.25rem 0.85rem;
+  color: var(--text-4);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* --- Markets ------------------------------------------------------------------ */
+
+.markets table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.markets th {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  text-align: left;
+}
+
+.markets th.r {
+  text-align: right;
+}
+
+.markets td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.markets tr:last-child td {
+  border-bottom: 0;
+}
+
+.markets tbody tr {
+  cursor: pointer;
+  transition: background-color 0.12s var(--ease);
+}
+
+.markets tbody tr:hover td,
+.markets tbody tr:focus-visible td {
+  background: var(--panel-2);
+}
+
+.markets .pair {
+  display: block;
+  font-family: var(--mono);
+}
+
+.markets .addr {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-4);
+}
+
+.markets .foot {
+  margin-top: 0.75rem;
+  font-size: 0.6875rem;
+  color: var(--text-4);
+}
+
+/* --- Trade -------------------------------------------------------------------- */
+
+.trade {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.ticker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.ticker .pair {
+  display: grid;
+  margin-right: auto;
+}
+
+.ticker .pair b {
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+}
+
+.ticker .pair span {
+  font-size: 0.6875rem;
+}
+
+.figure {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.figure .l {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.figure .v {
+  font-size: 0.875rem;
+}
+
+/*
+ * Chart across the top, then book, tape and position beneath it. The ladder is the widest
+ * of the three because it is the one people read down; the tape and the position are
+ * glanced at.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "chart chart chart"
+    "book tape position";
+  gap: 0.6rem;
+}
+
+.chart {
+  grid-area: chart;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 340px;
+}
+
+.chart .canvas {
+  min-height: 300px;
+}
+
+.ladder {
+  grid-area: book;
+}
+
+.tape {
+  grid-area: tape;
+}
+
+.position {
+  grid-area: position;
+}
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "chart"
+      "book"
+      "tape"
+      "position";
+  }
+}
+
+/* --- Ladder ------------------------------------------------------------------- */
+
+.ladder .side {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ladder li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.85rem;
+  padding: 0.18rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* Depth grows from the right, away from the price column, so it never sits under the one
+   number being read. */
+.ladder .bar {
+  position: absolute;
+  inset: 0 0 0 auto;
+  transition: width 0.35s var(--ease);
+}
+
+.ladder li.bid .bar {
+  background: rgb(74 222 155 / 0.1);
+}
+
+.ladder li.ask .bar {
+  background: rgb(239 125 99 / 0.1);
+}
+
+.ladder .p,
+.ladder .s,
+.ladder .t {
+  position: relative;
+}
+
+.ladder .spread {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  border-block: 1px solid var(--line);
+  background: rgb(255 255 255 / 0.02);
+}
+
+.ladder .mark {
+  font-size: 0.9375rem;
+}
+
+.ladder .gap {
+  font-size: 0.6875rem;
+}
+
+.ladder .touch {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.6875rem;
+  color: var(--text-4);
+}
+
+/* --- Tape --------------------------------------------------------------------- */
+
+.tape ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+.tape li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.85rem;
+  padding: 0.18rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* A fill whose slot can still be abandoned. Dimmed and italicised rather than hidden:
+   it probably happened, and pretending otherwise is its own kind of wrong. */
+.tape li.pending {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.tape .retracted {
+  color: var(--ask);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tape footer,
+.position footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.6875rem;
+  color: var(--text-4);
+}
+
+/* --- Position ----------------------------------------------------------------- */
+
+.balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.balance {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.balance .l {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.balance .v {
+  font-size: 0.8125rem;
+}
+
+.position .orders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.position .orders li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  padding: 0.18rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* --- Portfolio ---------------------------------------------------------------- */
+
+.portfolio {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.portfolio .head a {
+  font-family: var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.portfolio .head a:hover {
+  color: var(--green);
+}
