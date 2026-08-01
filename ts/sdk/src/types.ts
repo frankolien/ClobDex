@@ -38,36 +38,40 @@ export interface Instruction {
   readonly data: Uint8Array;
 }
 
-/** Which side of the book an order is on. */
-export enum Side {
-  Bid = 0,
-  Ask = 1,
-}
+/**
+ * Which side of the book an order is on.
+ *
+ * A frozen object rather than a TypeScript `enum`, here and below. An enum emits runtime
+ * code, so it cannot be erased — Node refuses to run it when stripping types, and the
+ * whole package would then need a build step to be testable. `erasableSyntaxOnly` in
+ * tsconfig keeps one from creeping back in.
+ */
+export const Side = { Bid: 0, Ask: 1 } as const;
+export type Side = (typeof Side)[keyof typeof Side];
 
 /** What to do when an order would match the trader's own resting liquidity. */
-export enum SelfTradeBehavior {
+export const SelfTradeBehavior = {
   /** Shrink both sides by the overlap without transferring anything. No fee. */
-  DecrementTake = 0,
+  DecrementTake: 0,
   /** Cancel the resting order and keep matching at undiminished size. */
-  CancelProvide = 1,
+  CancelProvide: 1,
   /** Reject the whole order. */
-  Abort = 2,
-}
+  Abort: 2,
+} as const;
+export type SelfTradeBehavior = (typeof SelfTradeBehavior)[keyof typeof SelfTradeBehavior];
 
 /** What to do when a post-only order would cross. */
-export enum PostOnlyRejection {
+export const PostOnlyRejection = {
   /** Refuse the order. */
-  Reject = 0,
+  Reject: 0,
   /** Reprice to the best non-crossing tick and rest there. */
-  Slide = 1,
-}
+  Slide: 1,
+} as const;
+export type PostOnlyRejection = (typeof PostOnlyRejection)[keyof typeof PostOnlyRejection];
 
 /** Which capacities a market account was created at. */
-export enum SizeClass {
-  Small = 0,
-  Medium = 1,
-  Large = 2,
-}
+export const SizeClass = { Small: 0, Medium: 1, Large: 2 } as const;
+export type SizeClass = (typeof SizeClass)[keyof typeof SizeClass];
 
 /**
  * The identity of a resting order.

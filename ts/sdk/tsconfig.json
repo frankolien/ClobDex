@@ -27,7 +27,12 @@
     // let tsc accept that and rewrite it to `.js` when it emits, so one set of imports
     // works both for `node --test` and for a built package.
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+
+    // Node strips types rather than compiling them, so anything that would emit runtime
+    // code — an enum, a namespace, a parameter property — cannot run. Enforcing it here
+    // means the type checker says so, instead of the test runner discovering it.
+    "erasableSyntaxOnly": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }
