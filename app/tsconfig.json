@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    // Same two as the SDK, and for the same reason: Node runs the `.ts` in `test/`
+    // directly and its resolver does not guess extensions, so imports name the file that
+    // exists. Vite resolves them identically.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+
+    // Node strips types rather than compiling them, so anything emitting runtime code —
+    // an enum, a namespace, a parameter property — cannot run under `node --test`. The
+    // type checker says so here instead of the test runner discovering it.
+    "erasableSyntaxOnly": true,
+
+    // The SDK is consumed as source rather than as a built package. It has no build step
+    // of its own worth waiting on, and one resolution rule means a change to the wire
+    // format is a type error here immediately rather than after a publish.
+    "paths": {
+      "@clobdex/sdk": ["../ts/sdk/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "vite.config.ts"]
+}

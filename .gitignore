@@ -12,6 +12,9 @@ target/
 # Markets created by clob-cli, including mint keypairs.
 .clob/
 
-# Node dependencies and build output.
+# Node dependencies and build output. Unanchored for the same reason as `target/`: the
+# SDK, the app and the marketing site are separate packages with separate deploys, and
+# each produces its own.
 node_modules/
-ts/**/dist/
+dist/
+.astro/
