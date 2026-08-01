@@ -106,3 +106,10 @@ npm run build   # only to emit .d.ts and .js for consumers
 `enum` is not available: it emits runtime code, so Node cannot erase it, and
 `erasableSyntaxOnly` makes the type checker say so rather than the test runner. Constants
 are frozen objects with a matching type, which reads the same at the call site.
+
+`@types/node` is a declared dependency rather than an assumption. It was missing once and
+the typecheck still passed locally: TypeScript resolves `node:test` by walking up
+`node_modules`, and an unrelated copy in a home directory several levels above the
+repository answered for it. CI, which has nothing above the checkout, was the only place
+the omission was visible — so `npm ci` in a directory that inherits nothing is the check
+that means something.

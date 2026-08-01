@@ -11,13 +11,17 @@
       "default": "./src/index.ts"
     }
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "test": "node --test 'test/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "typescript": "^5.9.0"
   }
 }
