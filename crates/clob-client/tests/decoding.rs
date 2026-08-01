@@ -389,3 +389,62 @@ fn decode_all_picks_events_out_of_a_mixed_instruction_list() {
     assert_eq!(decoded.len(), 1);
     assert_eq!(decoded[0].taker_seat, 7);
 }
+
+// -------------------------------------------------------------------------------------
+// Seat indices
+//
+// An observer resolves the wallet that signed a transaction into a seat index, then
+// compares that index against the owner of every order the transaction consumed. If the
+// two ever disagree, a self-trade reads as a fill and reported volume becomes something
+// anyone can inflate by crossing their own quotes. These check they agree.
+// -------------------------------------------------------------------------------------
+
+#[test]
+fn a_seat_index_matches_the_orders_that_wallet_owns() {
+    let wallets = [TraderKey([1u8; 32]), TraderKey([2u8; 32])];
+    let state = MarketState::decode(&laddered()).unwrap();
+
+    for wallet in wallets {
+        let seat = state.seat_of(&wallet).expect("wallet holds a seat");
+
+        // Every order carrying this index must be reachable from this wallet, and the
+        // wallet must own at least one — otherwise the join proves nothing.
+        let owned: Vec<_> = [Side::Bid, Side::Ask]
+            .iter()
+            .flat_map(|side| state.side(*side))
+            .filter(|order| order.trader_index == seat)
+            .collect();
+        assert!(!owned.is_empty(), "{wallet:?} has no orders at seat {seat}");
+    }
+
+    // Two wallets, two distinct seats. A shared index would make them one trader.
+    assert_ne!(
+        state.seat_of(&wallets[0]).unwrap(),
+        state.seat_of(&wallets[1]).unwrap()
+    );
+}
+
+#[test]
+fn every_resting_order_belongs_to_a_claimed_seat() {
+    let state = MarketState::decode(&laddered()).unwrap();
+    let claimed: Vec<u32> = state.traders.iter().map(|seat| seat.index).collect();
+
+    for side in [Side::Bid, Side::Ask] {
+        for order in state.side(side) {
+            assert!(
+                claimed.contains(&order.trader_index),
+                "order {:?} points at seat {} which nobody holds",
+                order.id,
+                order.trader_index
+            );
+        }
+    }
+}
+
+#[test]
+fn a_wallet_without_a_seat_resolves_to_nothing() {
+    // The observer treats an unresolved trader as "cannot tell", not as seat zero —
+    // which would silently attribute someone else's liquidity to them.
+    let state = MarketState::decode(&laddered()).unwrap();
+    assert_eq!(state.seat_of(&TraderKey([99u8; 32])), None);
+}

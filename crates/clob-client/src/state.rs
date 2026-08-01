@@ -88,8 +88,8 @@ pub struct MarketState {
     pub bids: Vec<BookOrder>,
     /// Asks, best first — lowest price, oldest within a price.
     pub asks: Vec<BookOrder>,
-    /// Claimed seats and their balances.
-    pub traders: Vec<(TraderKey, TraderState)>,
+    /// Claimed seats, with the index resting orders refer to them by.
+    pub traders: Vec<Seat>,
 }
 
 /// Pulls the orders and seats out of a concrete market into owned vectors.
@@ -107,7 +107,15 @@ macro_rules! decode_sized {
             *market.header(),
             collect_side(market.book().iter_side(Side::Bid)),
             collect_side(market.book().iter_side(Side::Ask)),
-            market.traders().iter().collect::<Vec<_>>(),
+            market
+                .traders()
+                .iter_indexed()
+                .map(|(index, key, state)| Seat {
+                    index: index as u32,
+                    key,
+                    state,
+                })
+                .collect::<Vec<_>>(),
         )
     }};
 }
@@ -225,8 +233,8 @@ impl MarketState {
     pub fn evictable_seats(&self) -> Vec<TraderKey> {
         self.traders
             .iter()
-            .filter(|(_, state)| state.is_empty())
-            .map(|(key, _)| *key)
+            .filter(|seat| seat.state.is_empty())
+            .map(|seat| seat.key)
             .collect()
     }
 
@@ -244,9 +252,22 @@ impl MarketState {
         }
     }
 
+    /// The seat index a wallet's orders carry, if it holds a seat.
+    ///
+    /// This is how an observer resolves the trader that submitted a transaction into
+    /// something comparable with the orders on the book. Without it, a self-trade and a
+    /// fill are indistinguishable — both remove liquidity from the side opposite the
+    /// taker — and reported volume becomes something anyone can inflate for free.
+    pub fn seat_of(&self, key: &TraderKey) -> Option<u32> {
+        self.traders
+            .iter()
+            .find(|seat| &seat.key == key)
+            .map(|seat| seat.index)
+    }
+
     /// Balances for a trader, if they hold a seat.
     pub fn trader(&self, key: &TraderKey) -> Option<&TraderState> {
-        self.traders.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+        self.traders.iter().find(|seat| &seat.key == key).map(|seat| &seat.state)
     }
 
     /// Aggregates `side` into price levels, best first, up to `depth` levels.
@@ -313,6 +334,22 @@ impl MarketState {
         }
         None
     }
+}
+
+/// A claimed seat: who holds it, what they hold, and the index it is known by.
+///
+/// Resting orders carry the index rather than the wallet, so this is the join between
+/// an order on the book and the wallet that owns it. An observer needs that join to tell
+/// a fill from a self-trade — a distinction only ownership can make, and one that
+/// decides whether a trade is reported as volume at all.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Seat {
+    /// What resting orders refer to this seat by.
+    pub index: u32,
+    /// The wallet holding it.
+    pub key: TraderKey,
+    /// Its balances.
+    pub state: TraderState,
 }
 
 /// One aggregated price level.
