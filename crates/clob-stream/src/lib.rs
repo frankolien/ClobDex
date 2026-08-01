@@ -4,6 +4,7 @@ pub mod api;
 pub mod attribute;
 pub mod candle;
 pub mod correlate;
+pub mod flush;
 pub mod laserstream;
 pub mod pipeline;
 pub mod registry;
