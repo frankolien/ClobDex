@@ -118,6 +118,63 @@ fn report() {
 }
 
 #[test]
+fn batching_a_refresh_costs_less_than_the_instructions_it_replaces() {
+    // The reason batch exists. A maker replacing a two-sided ladder pays for one
+    // instruction instead of one per quote, and the per-instruction overhead — loading
+    // accounts, re-deriving the seat, re-borrowing the market — is paid once.
+    let (fixture, market) = book_with_depth(16);
+    let maker = trader(1);
+
+    let resting: Vec<_> = market_of(&market)
+        .book()
+        .iter_side(Side::Ask)
+        .map(|entry| entry.key)
+        .take(4)
+        .collect();
+
+    let batched = measure(
+        market.clone(),
+        maker,
+        &batch_ix(
+            fixture.market,
+            maker,
+            &resting,
+            &[
+                post_only_packet(Side::Ask, 200, 1),
+                post_only_packet(Side::Ask, 201, 1),
+                post_only_packet(Side::Ask, 202, 1),
+                post_only_packet(Side::Ask, 203, 1),
+            ],
+        ),
+        fixture.market,
+    );
+
+    // What the same work costs as separate instructions: one cancel plus one place,
+    // times four.
+    let single_cancel = measure(
+        market.clone(),
+        maker,
+        &cancel_ix(fixture.market, maker, resting[0]),
+        fixture.market,
+    );
+    let single_place = measure(
+        market.clone(),
+        maker,
+        &post_only_ix(fixture.market, maker, Side::Ask, 200, 1),
+        fixture.market,
+    );
+    let separately = 4 * (single_cancel + single_place);
+
+    println!("  4 cancels + 4 places, batched      {batched:>6} CU");
+    println!("  the same, as 8 instructions        {separately:>6} CU");
+    assert!(
+        batched < separately,
+        "batching cost {batched} CU against {separately} separately — it must be cheaper \
+         than the instructions it replaces, or there is no reason for it to exist"
+    );
+}
+
+#[test]
 fn a_maker_action_leaves_room_to_batch() {
     // A market maker cancel-replaces continuously, so a single quote update has to be
     // cheap enough that several fit in one 1.4M CU transaction alongside the signature

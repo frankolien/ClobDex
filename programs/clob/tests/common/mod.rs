@@ -26,8 +26,83 @@ pub const PROGRAM_ID: Pubkey = Pubkey::new_from_array([9u8; 32]);
 pub type TestMarket = Market<128, 128, 32>;
 
 pub fn mollusk() -> Mollusk {
+    assert_program_is_current();
     // Resolved relative to the workspace target directory by `cargo build-sbf`.
     Mollusk::new(&PROGRAM_ID, "clob_program")
+}
+
+/// Warns when the compiled program looks older than its source, and fails when it is
+/// absent entirely.
+///
+/// Mollusk executes the `.so`, not the crate. A source change that has not been through
+/// `cargo build-sbf` is therefore tested in its *previous* form, and the failure looks
+/// like a logic bug — an unknown discriminant, a missing branch — rather than a stale
+/// artifact. This turns a confusing hour into one line of output.
+///
+/// Modification time is a heuristic, not proof: a fresh checkout stamps every source
+/// with the current time while a warm build cache leaves a perfectly current `.so`
+/// untouched. So a suspicious timestamp warns and a missing file fails, rather than the
+/// other way round — a false failure on a clean clone would be worse than the problem.
+fn assert_program_is_current() {
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = manifest
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("the program lives two levels under the workspace root");
+
+    let binary = match std::env::var("SBF_OUT_DIR") {
+        Ok(dir) => std::path::PathBuf::from(dir).join("clob_program.so"),
+        Err(_) => root.join("target/deploy/clob_program.so"),
+    };
+
+    let Ok(built) = std::fs::metadata(&binary).and_then(|meta| meta.modified()) else {
+        panic!(
+            "no compiled program at {} — run: cargo build-sbf --manifest-path programs/clob/Cargo.toml",
+            binary.display()
+        );
+    };
+
+    // Only the crates that end up inside the binary. A change to the SDK or the indexer
+    // cannot make the .so stale.
+    let sources = [
+        manifest.join("src"),
+        root.join("crates/clob-engine/src"),
+        root.join("crates/clob-book/src"),
+    ];
+    if let Some(newest) = sources.iter().filter_map(|dir| newest_source(dir)).max()
+        && newest > built
+    {
+        eprintln!(
+            "\nwarning: the compiled program may be older than its source.\n         \
+             If a test fails for a reason that makes no sense, run:\n           \
+             cargo build-sbf --manifest-path programs/clob/Cargo.toml\n"
+        );
+    }
+}
+
+/// The most recent modification time of any `.rs` file under `dir`.
+fn newest_source(dir: &std::path::Path) -> Option<std::time::SystemTime> {
+    let mut newest = None;
+    let mut stack = vec![dir.to_path_buf()];
+
+    while let Some(path) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&path) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs")
+                && let Ok(modified) = entry.metadata().and_then(|meta| meta.modified())
+            {
+                newest = Some(newest.map_or(modified, |current: std::time::SystemTime| {
+                    current.max(modified)
+                }));
+            }
+        }
+    }
+    newest
 }
 
 /// SOL/USDC-shaped geometry: one base lot is 0.001 SOL, one tick is $0.001.
@@ -404,4 +479,57 @@ pub fn funds_ix(
         accounts,
         data,
     }
+}
+
+impl Fixture {
+    /// Runs instructions in order against `market`, returning the resulting account.
+    ///
+    /// Each is processed separately, because Mollusk validates one instruction at a
+    /// time; threading the account through is what makes a sequence expressible.
+    pub fn run(&self, instructions: &[Instruction], market: Account, signer: Pubkey) -> Account {
+        let mut market = market;
+        for instruction in instructions {
+            let result = mollusk().process_and_validate_instruction(
+                instruction,
+                &[(self.market, market), (signer, wallet())],
+                &[mollusk_svm::result::Check::success()],
+            );
+            market = result.resulting_accounts[0].1.clone();
+        }
+        market
+    }
+
+    /// Asserts the instruction is rejected, and that the market is untouched by it.
+    pub fn expect_failure(&self, instructions: &[Instruction], market: Account, signer: Pubkey) {
+        for instruction in instructions {
+            let result = mollusk().process_instruction(
+                instruction,
+                &[(self.market, market.clone()), (signer, wallet())],
+            );
+            assert!(
+                result.raw_result.is_err(),
+                "expected this instruction to be rejected"
+            );
+        }
+    }
+}
+
+/// A batched cancel-and-place, as a market maker refreshing quotes would send it.
+pub fn batch_ix(
+    market: Pubkey,
+    trader: Pubkey,
+    cancels: &[FIFOOrderId],
+    orders: &[clob_engine::OrderPacket],
+) -> Instruction {
+    sdk::batch_update(&bare_addresses(market), &trader, cancels, orders)
+}
+
+/// A post-only packet, for building batches.
+pub fn post_only_packet(side: Side, price: u64, size: u64) -> clob_engine::OrderPacket {
+    sdk::post_only(
+        side,
+        Ticks(price),
+        BaseLots(size),
+        clob_engine::PostOnlyRejection::Reject,
+    )
 }
