@@ -1,0 +1,150 @@
+# The two checks that are too slow to run on every push and too valuable to run by hand.
+#
+# Both exist because the project already depends on them being true. The roadmap's security
+# section calls for the conserve-funds invariant to run *continuously*, which a campaign
+# somebody remembers to invoke is not. And every commit here is expected to build and test
+# on its own — a claim that decays the moment nobody is checking it.
+
+name: Nightly
+
+on:
+  schedule:
+    # 03:00 UTC. Nothing depends on the hour; it only has to be a time nobody is pushing.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: Sequences for the fuzz campaign
+        default: '20000'
+      commits:
+        description: How many recent commits to verify build and test on their own
+        default: '5'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SOLANA_VERSION: 3.1.12
+
+jobs:
+  fuzz:
+    name: conserve-funds campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache the Solana toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cache/solana
+          key: solana-${{ runner.os }}-${{ env.SOLANA_VERSION }}
+
+      - name: Install the Solana toolchain
+        run: |
+          if [ ! -x "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build for SBF
+        run: cargo build-sbf --manifest-path programs/clob/Cargo.toml
+
+      # Release, because the campaign is bounded by how many instructions it can execute
+      # and a debug build spends most of its time in Mollusk rather than in the program.
+      # The shrink budget is raised to match: a failure found after twenty thousand
+      # sequences is worth minutes of reduction, since the shrunk sequence is the whole
+      # difference between a bug report and a seed.
+      - name: Run the campaign
+        run: cargo test --release -p clob-program --test fuzz_campaign
+        env:
+          PROPTEST_CASES: ${{ inputs.cases || '20000' }}
+          PROPTEST_MAX_SHRINK_ITERS: '4096'
+
+      # proptest writes the failing seed to disk. That file is the reproduction — without
+      # it a nightly failure is a log line saying something once went wrong.
+      - name: Keep the failing seed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proptest-regressions
+          path: programs/clob/tests/*.proptest-regressions
+          if-no-files-found: warn
+
+  bisect:
+    name: recent commits stand alone
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the commit count is an input, and a shallow clone would fail on
+          # a sweep longer than whatever depth was guessed here.
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache the Solana toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cache/solana
+          key: solana-${{ runner.os }}-${{ env.SOLANA_VERSION }}
+
+      - name: Install the Solana toolchain
+        run: |
+          if [ ! -x "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      # Builds *and* tests, not just builds. A commit that compiles while its own tests do
+      # not is the failure this repository keeps producing: a change lands with the fix to
+      # its dependents in a later commit, and `git bisect` walks straight into it.
+      - name: Verify each commit on its own
+        run: |
+          # Actions runs `run:` under `bash -e`, which would abort at the first failing
+          # commit. The whole point is to check them all and report every one that broke,
+          # so failures are recorded rather than fatal.
+          set +e
+          commits="${{ inputs.commits || '5' }}"
+          broken=()
+
+          for sha in $(git rev-list --reverse -n "$commits" HEAD); do
+            subject=$(git log -1 --format=%s "$sha")
+            echo "::group::$sha  $subject"
+            git checkout -q --detach "$sha"
+
+            ok=1
+            cargo build-sbf --manifest-path programs/clob/Cargo.toml || ok=0
+            [ "$ok" = 1 ] && { cargo test --workspace || ok=0; }
+            if [ "$ok" = 1 ]; then
+              for workspace in clob-ops clob-cli clob-mm clob-stream; do
+                # A workspace that did not exist yet is not a failure. Walking back far
+                # enough reaches commits from before it was written, and treating a
+                # missing directory as broken would condemn every one of them.
+                [ -d "crates/$workspace" ] || continue
+                (cd "crates/$workspace" && cargo test) || { ok=0; break; }
+              done
+            fi
+
+            if [ "$ok" = 1 ]; then
+              echo "PASS  $sha  $subject"
+            else
+              echo "FAIL  $sha  $subject"
+              broken+=("$sha  $subject")
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "${#broken[@]}" -gt 0 ]; then
+            echo "::error::${#broken[@]} commit(s) do not build and test on their own"
+            printf '  %s\n' "${broken[@]}"
+            exit 1
+          fi
+          echo "every commit checked builds and tests on its own"

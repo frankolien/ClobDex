@@ -1,0 +1,97 @@
+# Every push, every branch.
+#
+# Five workspaces, because Cargo resolves one dependency graph per workspace and the
+# on-chain crates cannot share a lockfile with an RPC client (see the `exclude` note in
+# the root Cargo.toml). A single `cargo test` would silently cover one fifth of the repo,
+# so each is invoked on its own and the matrix makes it obvious which one broke.
+#
+# There is no `cargo fmt --check`. The source is hand-wrapped — comment prose is broken at
+# meaning rather than at a column — and rustfmt disagrees with it in 208 places at any
+# width. Enforcing the tool would mean deleting that formatting, so lints are enforced and
+# layout is not.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SOLANA_VERSION: 3.1.12
+
+jobs:
+  program:
+    name: program and on-chain crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The CLI, and the platform-tools it pulls down on first use — several hundred
+      # megabytes that have no reason to be fetched twice a day.
+      - name: Cache the Solana toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cache/solana
+          key: solana-${{ runner.os }}-${{ env.SOLANA_VERSION }}
+
+      # Mollusk executes the compiled binary rather than the Rust library, so the tests
+      # measure and assert against an artifact that has to exist before they run. A stale
+      # or missing one is the single most common way these tests lie.
+      - name: Install the Solana toolchain
+        run: |
+          if [ ! -x "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build for SBF
+        run: cargo build-sbf --manifest-path programs/clob/Cargo.toml
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Includes the conserve-funds campaign at its default size. Small enough to belong
+      # here; the nightly workflow runs it at a size that finds things.
+      - name: Test
+        run: cargo test --workspace
+
+  offchain:
+    name: ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One broken workspace should not hide the state of the other three.
+      fail-fast: false
+      matrix:
+        workspace: [clob-ops, clob-cli, clob-mm, clob-stream]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/${{ matrix.workspace }}
+
+      # No SBF build: nothing off-chain runs the program, so these need a Rust toolchain
+      # and nothing else.
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: crates/${{ matrix.workspace }}
+
+      - name: Test
+        run: cargo test
+        working-directory: crates/${{ matrix.workspace }}
