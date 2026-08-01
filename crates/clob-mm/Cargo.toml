@@ -16,3 +16,7 @@ publish = false
 clob-book = { path = "../clob-book" }
 clob-client = { path = "../clob-client" }
 clob-engine = { path = "../clob-engine" }
+
+[dev-dependencies]
+bytemuck = { version = "1.23", default-features = false }
+clob-program = { path = "../../programs/clob" }

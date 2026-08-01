@@ -12,6 +12,7 @@
 
 #![deny(missing_docs)]
 
+pub mod fair;
 pub mod params;
 
 pub use params::{Params, ParamsError};

@@ -112,9 +112,11 @@ dependencies = [
 name = "clob-mm"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "clob-book",
  "clob-client",
  "clob-engine",
+ "clob-program",
 ]
 
 [[package]]
