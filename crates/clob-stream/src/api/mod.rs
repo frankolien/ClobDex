@@ -1,9 +1,10 @@
-//! The read surface.
+//! The read surface: HTTP for snapshots, WebSocket for the live feed.
 //!
 //! actix runs `!Send` futures per worker, so handlers reach shared state through an
 //! `Arc<Registry>` and never hold its lock across an await.
 
 pub mod http;
+pub mod ws;
 
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ pub async fn serve(registry: Arc<Registry>, bind: &str) -> std::io::Result<()> {
             .service(http::book)
             .service(http::trades)
             .service(http::health)
+            .route("/v1/markets/{market}/stream", web::get().to(ws::stream))
     })
     .bind(bind)?
     .run()

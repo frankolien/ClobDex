@@ -184,3 +184,7 @@ pub async fn health(registry: web::Data<Registry>) -> impl Responder {
     }
 }
 
+/// Shared by the HTTP and WebSocket sides so both report a trade identically.
+pub(crate) fn trades_of(delta: &clob_indexer::BookDelta) -> Vec<Trade> {
+    delta.trades.iter().map(Trade::from).collect()
+}
