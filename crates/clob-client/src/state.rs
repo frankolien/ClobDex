@@ -203,6 +203,21 @@ impl MarketState {
         &self.header.fees
     }
 
+    /// Where a fee sweep sends the quote it collects.
+    ///
+    /// Needed by callers rather than only by the venue:
+    /// [`collect_fees`](crate::instruction::collect_fees) is permissionless, and the
+    /// recipient it must be given is fixed in the account — which is exactly why anyone
+    /// may call it and nobody gains by doing so.
+    pub fn fee_recipient(&self) -> solana_pubkey::Pubkey {
+        solana_pubkey::Pubkey::new_from_array(self.account.fee_recipient)
+    }
+
+    /// The market's authority.
+    pub fn authority(&self) -> solana_pubkey::Pubkey {
+        solana_pubkey::Pubkey::new_from_array(self.account.authority)
+    }
+
     /// Orders on `side`, best first.
     pub fn side(&self, side: Side) -> &[BookOrder] {
         match side {
