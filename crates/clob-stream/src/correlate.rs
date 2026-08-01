@@ -55,6 +55,12 @@ pub struct Correlator {
     account_order: VecDeque<[u8; 64]>,
     /// Highest slot seen, from any update.
     tip: u64,
+    /// Slot each market's baseline is known good at.
+    ///
+    /// An account update older than this describes a state the baseline already
+    /// supersedes; treating it as current would walk the book backwards and make the
+    /// next diff report liquidity appearing that had merely not been removed yet.
+    known_at: HashMap<Pubkey, u64>,
 }
 
 impl Correlator {
@@ -75,11 +81,29 @@ impl Correlator {
 
     /// Seeds a market's state without producing a change.
     ///
-    /// Used for the initial fetch, and for snapshot updates the cluster sends without
-    /// attributing them to a transaction. There is nothing to derive from a state that
-    /// arrived unexplained — only something to diff the *next* one against.
+    /// Used for snapshot updates the cluster sends without attributing them to a
+    /// transaction. There is nothing to derive from a state that arrived unexplained —
+    /// only something to diff the *next* one against.
     pub fn seed(&mut self, market: Pubkey, data: Vec<u8>) {
         self.latest.insert(market, data);
+    }
+
+    /// Seeds a market's state from a snapshot known to be true at `slot`.
+    ///
+    /// Account updates older than `slot` are ignored afterwards. Without that, an update
+    /// still queued from before the snapshot would replace a newer baseline with an
+    /// older one, and the following diff would report liquidity as newly posted when it
+    /// had simply not been removed yet.
+    pub fn seed_at(&mut self, market: Pubkey, data: Vec<u8>, slot: u64) {
+        self.latest.insert(market, data);
+        let known = self.known_at.entry(market).or_insert(slot);
+        *known = (*known).max(slot);
+        self.tip = self.tip.max(slot);
+    }
+
+    /// Whether an account update predates what is already known about that market.
+    fn is_stale(&self, market: &Pubkey, slot: u64) -> bool {
+        self.known_at.get(market).is_some_and(|known| slot < *known)
     }
 
     /// Feeds one update in, and gets back a change when a pair completes.
@@ -100,6 +124,10 @@ impl Correlator {
                 signature,
             } => {
                 self.tip = self.tip.max(slot);
+                if self.is_stale(&market, slot) {
+                    return None;
+                }
+                self.known_at.insert(market, slot);
                 let Some(signature) = signature else {
                     // Unattributed: record it as the new baseline and derive nothing.
                     self.latest.insert(market, data);

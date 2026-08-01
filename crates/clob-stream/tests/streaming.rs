@@ -390,3 +390,117 @@ async fn a_replay_source_drives_the_correlator() {
     assert_eq!(correlator.tip(), 1);
     assert_eq!(correlator.latest(&MARKET), Some(&[5u8; 4][..]));
 }
+
+// -------------------------------------------------------------------------------------
+// Seeding from a snapshot
+//
+// Without a snapshot the first update for a market only establishes a baseline, so every
+// restart loses the first transaction on every market. Seeding closes that — but a
+// snapshot is only true at a slot, and the subscription opens *before* it is taken, so
+// updates from before that slot can still be in flight behind it.
+// -------------------------------------------------------------------------------------
+
+#[test]
+fn a_seeded_market_derives_from_its_very_first_transaction() {
+    let mut correlator = Correlator::new();
+    correlator.seed_at(MARKET, vec![1u8; 4], 100);
+
+    correlator.accept(Update::Transaction {
+        slot: 101,
+        signature: signature(9),
+        succeeded: true,
+        instructions: Vec::new(),
+    });
+    let change = correlator
+        .accept(Update::Account {
+            slot: 101,
+            market: MARKET,
+            data: vec![2u8; 4],
+            signature: Some(signature(9)),
+        })
+        .expect("the pair completed");
+
+    assert_eq!(
+        change.before.as_deref(),
+        Some(&[1u8; 4][..]),
+        "the snapshot is the baseline, so the first transaction is derivable"
+    );
+}
+
+#[test]
+fn an_update_older_than_the_snapshot_is_ignored() {
+    // The subscription opens before the snapshot is taken, so updates from before it can
+    // still arrive. Accepting one would replace a newer baseline with an older one, and
+    // the next diff would report liquidity as newly posted when it had merely not been
+    // removed yet.
+    let mut correlator = Correlator::new();
+    correlator.seed_at(MARKET, vec![9u8; 4], 500);
+
+    assert!(
+        correlator
+            .accept(Update::Account {
+                slot: 499,
+                market: MARKET,
+                data: vec![1u8; 4],
+                signature: Some(signature(8)),
+            })
+            .is_none()
+    );
+    assert_eq!(
+        correlator.latest(&MARKET),
+        Some(&[9u8; 4][..]),
+        "the snapshot still stands"
+    );
+    assert_eq!(correlator.pending(), 0, "and nothing was buffered waiting for it");
+}
+
+#[test]
+fn an_update_at_the_snapshot_slot_is_still_accepted() {
+    // The snapshot is true *as of* that slot, and a write in the same slot is not older
+    // than it — rejecting it would drop a real transaction.
+    let mut correlator = Correlator::new();
+    correlator.seed_at(MARKET, vec![9u8; 4], 500);
+    correlator.accept(Update::Transaction {
+        slot: 500,
+        signature: signature(7),
+        succeeded: true,
+        instructions: Vec::new(),
+    });
+
+    assert!(
+        correlator
+            .accept(Update::Account {
+                slot: 500,
+                market: MARKET,
+                data: vec![1u8; 4],
+                signature: Some(signature(7)),
+            })
+            .is_some()
+    );
+}
+
+#[test]
+fn staleness_is_tracked_per_market() {
+    // One market's snapshot slot must not silence another's updates.
+    let other = Pubkey::new_from_array([42u8; 32]);
+    let mut correlator = Correlator::new();
+    correlator.seed_at(MARKET, vec![9u8; 4], 500);
+
+    correlator.accept(Update::Transaction {
+        slot: 10,
+        signature: signature(6),
+        succeeded: true,
+        instructions: Vec::new(),
+    });
+    assert!(
+        correlator
+            .accept(Update::Account {
+                slot: 10,
+                market: other,
+                data: vec![1u8; 4],
+                signature: Some(signature(6)),
+            })
+            .is_some(),
+        "a market with no snapshot is unaffected by another's"
+    );
+}
