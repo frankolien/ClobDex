@@ -160,6 +160,17 @@ impl<const SEATS: usize> TraderTable<SEATS> {
     pub fn iter(&self) -> impl Iterator<Item = (TraderKey, TraderState)> + '_ {
         self.seats.iter().map(|entry| (entry.key, entry.value))
     }
+
+    /// Every claimed seat with its index, ascending by key.
+    ///
+    /// The index is what resting orders carry, so this is the join between an order on
+    /// the book and the wallet that owns it. An observer needs it to tell a fill from a
+    /// self-trade, which is a distinction only ownership can make.
+    pub fn iter_indexed(&self) -> impl Iterator<Item = (SeatIndex, TraderKey, TraderState)> + '_ {
+        self.seats
+            .iter()
+            .map(|entry| (entry.handle, entry.key, entry.value))
+    }
 }
 
 #[cfg(test)]
