@@ -156,6 +156,81 @@ pub enum Message {
     },
 }
 
+/// One OHLCV bucket.
+#[derive(Serialize)]
+pub struct Candle {
+    /// First slot in the bucket. Buckets are `[start_slot, start_slot + interval)`.
+    pub start_slot: u64,
+    /// Price of the first trade in the bucket.
+    pub open: u64,
+    /// Highest price traded.
+    pub high: u64,
+    /// Lowest price traded.
+    pub low: u64,
+    /// Price of the last trade in the bucket.
+    pub close: u64,
+    /// Total size, in base lots.
+    pub base_lots: u64,
+    /// Total gross value, in quote lots.
+    pub quote_lots: u64,
+    /// How many trades went into it.
+    pub trades: u64,
+}
+
+impl From<&crate::candle::Candle> for Candle {
+    fn from(candle: &crate::candle::Candle) -> Self {
+        Self {
+            start_slot: candle.start_slot,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            base_lots: candle.base_lots,
+            quote_lots: candle.quote_lots,
+            trades: candle.trades,
+        }
+    }
+}
+
+/// A trade read back out of the store.
+///
+/// Always rooted — nothing else is ever written — so unlike the live shape it carries no
+/// `finalized` flag to check.
+#[derive(Serialize)]
+pub struct HistoricalTrade {
+    /// Slot it landed in.
+    pub slot: u64,
+    /// The transaction, hex-encoded.
+    pub signature: String,
+    /// Execution price — always the maker's.
+    pub price_in_ticks: u64,
+    /// Size, in base lots.
+    pub base_lots: u64,
+    /// Gross quote value, before fee.
+    pub quote_lots: u64,
+    /// Side the taker was on.
+    pub taker_side: &'static str,
+    /// Seat that owned the resting order.
+    pub maker_seat: u32,
+}
+
+impl From<&crate::store::StoredTrade> for HistoricalTrade {
+    fn from(trade: &crate::store::StoredTrade) -> Self {
+        Self {
+            slot: trade.slot,
+            signature: trade.signature.iter().map(|b| format!("{b:02x}")).collect(),
+            price_in_ticks: trade.price_in_ticks,
+            base_lots: trade.base_lots,
+            quote_lots: trade.quote_lots,
+            taker_side: match trade.taker_side_is_bid {
+                true => "bid",
+                false => "ask",
+            },
+            maker_seat: trade.maker_seat,
+        }
+    }
+}
+
 /// Renders every trade in a delta.
 pub fn trades_of(delta: &clob_indexer::BookDelta, finalized_through: u64) -> Vec<Trade> {
     delta

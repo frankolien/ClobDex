@@ -16,8 +16,10 @@ use clob_stream::api;
 use clob_stream::correlate::Correlator;
 use clob_stream::laserstream::{self, LaserStream};
 use clob_stream::pipeline::{self, Outcome};
+use clob_stream::flush::{Pending, flush};
 use clob_stream::registry::Registry;
 use clob_stream::snapshot::Rpc;
+use clob_stream::store::{Memory, Store, clickhouse::ClickHouse};
 use clob_stream::source::{SlotStatus, Source, Update};
 use solana_pubkey::Pubkey;
 
@@ -34,6 +36,22 @@ fn main() -> Result<()> {
     let registry = Registry::new();
     let ingest_registry = Arc::clone(&registry);
 
+    // One store, shared: ingest writes to it and the history endpoints read from it.
+    // Persistence is optional — a deployment that only wants a live feed should not have
+    // to run a database to start — and the in-memory store is a real implementation, not
+    // a stub, so the read path is identical either way.
+    let store: Arc<dyn Store> = match ClickHouse::from_env() {
+        Some(clickhouse) => {
+            println!("persisting rooted trades to ClickHouse");
+            Arc::new(clickhouse)
+        }
+        None => {
+            println!("no CLICKHOUSE_URL — keeping trades in memory only");
+            Arc::new(Memory::new())
+        }
+    };
+    let ingest_store = Arc::clone(&store);
+
     // Ingest gets its own runtime and its own thread, so a stalled HTTP worker cannot
     // stop the stream and a stalled stream cannot stop the API from serving what it
     // already has.
@@ -44,12 +62,12 @@ fn main() -> Result<()> {
                 .enable_all()
                 .build()
                 .expect("building the ingest runtime");
-            runtime.block_on(run_ingest(ingest_registry, program_id))
+            runtime.block_on(run_ingest(ingest_registry, program_id, ingest_store))
         })
         .context("spawning the ingest thread")?;
 
     println!("serving on http://{bind}");
-    actix_web::rt::System::new().block_on(api::serve(registry, &bind))?;
+    actix_web::rt::System::new().block_on(api::serve(registry, store, &bind))?;
 
     // Only reached when the API stops; the ingest thread ends with the process.
     match ingest.join() {
@@ -59,7 +77,15 @@ fn main() -> Result<()> {
 }
 
 /// Consumes the stream until it ends.
-async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
+async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey, store: Arc<dyn Store>) -> Result<()> {
+    // Needs a runtime, so it happens here rather than where the store was chosen.
+    if let Some(clickhouse) = ClickHouse::from_env() {
+        clickhouse
+            .migrate()
+            .await
+            .context("preparing the ClickHouse table")?;
+    }
+
     let endpoint = laserstream::endpoint_from_env(program_id)?;
     println!("subscribing to {} at {}", program_id, endpoint.url);
 
@@ -68,6 +94,7 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
     // missed and the next diff would report two transactions' effects as one.
     let mut source = LaserStream::connect(&endpoint)?;
     let mut correlator = Correlator::new();
+    let mut pending = Pending::new();
 
     // Without this, the first update for each market only establishes a baseline, so
     // every restart silently loses the first transaction on every market.
@@ -81,6 +108,12 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
                     Ok(state) => {
                         correlator.seed_at(account.market, account.data.clone(), snapshot.slot);
                         registry.seed(account.market, state, snapshot.slot);
+
+                        // Resume from what is already durable rather than re-queueing
+                        // everything the endpoint replays.
+                        if let Ok(Some(stored)) = store.highest_slot(&account.market).await {
+                            pending = Pending::resuming_from(stored.max(pending.flushed_through()));
+                        }
                         println!("seeded {} from slot {}", account.market, snapshot.slot);
                     }
                     // The program owns more than markets — vaults are token accounts and
@@ -100,9 +133,21 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
         // the registry whether or not it produced a change worth pairing.
         if let Update::Slot { slot, status } = &update {
             match status {
-                SlotStatus::Finalized => registry.finalize(*slot),
+                SlotStatus::Finalized => {
+                    registry.finalize(*slot);
+                    // Only rooted trades are written, which is what lets the store be
+                    // append-only: anything retractable has not been written yet.
+                    match flush(&mut pending, store.as_ref(), *slot).await {
+                        Ok(0) => {}
+                        Ok(written) => println!("stored {written} trade(s) rooted at slot {slot}"),
+                        // Left queued for the next finalization: an unreachable store
+                        // should cost latency, not data.
+                        Err(error) => eprintln!("could not store trades: {error:#}"),
+                    }
+                }
                 SlotStatus::Dead => {
-                    println!("slot {slot} was abandoned — retracting its trades");
+                    let dropped = pending.retract(*slot);
+                    println!("slot {slot} was abandoned — retracting {dropped} unstored trade(s)");
                     registry.retract(*slot);
                 }
                 SlotStatus::Confirmed => {}
@@ -136,6 +181,12 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
                         derived.market
                     );
                 }
+                pending.record(
+                    derived.market,
+                    derived.slot,
+                    derived.signature,
+                    &derived.delta.trades,
+                );
                 registry.apply(derived, reconciled);
             }
             // One undecodable account is not a reason to stop streaming the others.

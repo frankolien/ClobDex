@@ -14,16 +14,24 @@ use actix_web::{App, HttpServer, web};
 use crate::registry::Registry;
 
 /// Serves the read API until the process stops.
-pub async fn serve(registry: Arc<Registry>, bind: &str) -> std::io::Result<()> {
+pub async fn serve(
+    registry: Arc<Registry>,
+    store: Arc<dyn crate::store::Store>,
+    bind: &str,
+) -> std::io::Result<()> {
     let state = web::Data::from(registry);
+    let store = web::Data::new(store);
 
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
+            .app_data(store.clone())
             .service(http::markets)
             .service(http::book)
             .service(http::trades)
             .service(http::health)
+            .service(http::history)
+            .service(http::candles)
             .route("/v1/markets/{market}/stream", web::get().to(ws::stream))
     })
     .bind(bind)?

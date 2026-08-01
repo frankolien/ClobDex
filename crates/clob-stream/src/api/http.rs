@@ -6,12 +6,16 @@
 //! Every handler clones a view out and releases the lock before serialising. One that
 //! held it across an await would stall ingest for every market at once, not just its own.
 
+use std::sync::Arc;
+
 use actix_web::{HttpResponse, Responder, get, web};
 use clob_book::Side;
 use solana_pubkey::Pubkey;
 
-use crate::api::view::{Book, Health, Trade, levels_of};
+use crate::api::view::{Book, Candle, Health, HistoricalTrade, Trade, levels_of};
+use crate::candle;
 use crate::registry::Registry;
+use crate::store::{Range, Store};
 
 /// How deep a book request may go.
 ///
@@ -112,5 +116,105 @@ pub async fn health(registry: web::Data<Registry>) -> impl Responder {
         0 => HttpResponse::Ok().json(health),
         // Still serving, but not claiming to be healthy: a monitor should see this.
         _ => HttpResponse::InternalServerError().json(health),
+    }
+}
+
+// -------------------------------------------------------------------------------------
+// History
+//
+// Served from the store rather than the in-memory tape, so it survives a restart and
+// reaches further back than the 1,024 trades the process keeps.
+// -------------------------------------------------------------------------------------
+
+/// Slots per candle when the caller does not say. Roughly a minute of slots.
+const DEFAULT_INTERVAL: u64 = 150;
+
+/// Candles a single request may return.
+const MAX_CANDLES: usize = 1_000;
+
+/// Trades one history request may scan.
+const MAX_HISTORY: usize = 10_000;
+
+#[derive(serde::Deserialize)]
+pub struct HistoryQuery {
+    from_slot: Option<u64>,
+    to_slot: Option<u64>,
+    limit: Option<usize>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct CandleQuery {
+    interval: Option<u64>,
+    from_slot: Option<u64>,
+    to_slot: Option<u64>,
+}
+
+fn range(from: Option<u64>, to: Option<u64>, limit: usize) -> Range {
+    Range {
+        from_slot: from.unwrap_or(0),
+        to_slot: to.unwrap_or(u64::MAX),
+        limit,
+    }
+}
+
+/// Stored trades for one market, oldest first.
+#[get("/v1/markets/{market}/history")]
+pub async fn history(
+    store: web::Data<Arc<dyn Store>>,
+    path: web::Path<String>,
+    query: web::Query<HistoryQuery>,
+) -> impl Responder {
+    let Ok(market) = path.parse::<Pubkey>() else {
+        return HttpResponse::BadRequest().body("not a pubkey");
+    };
+
+    let limit = query.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_HISTORY);
+    match store
+        .trades(&market, range(query.from_slot, query.to_slot, limit))
+        .await
+    {
+        // Named `found`, not `trades`: the #[get] macro defines a unit struct called
+        // `trades`, and a unit struct in scope turns `Ok(trades)` into a pattern that
+        // matches it rather than a fresh binding.
+        Ok(found) => {
+            let rows: Vec<HistoricalTrade> = found.iter().map(HistoricalTrade::from).collect();
+            HttpResponse::Ok().json(rows)
+        }
+        // A store that is down is a 503, not a 200 with an empty list — the difference
+        // between "nothing traded" and "we cannot tell" matters to whoever is asking.
+        Err(error) => HttpResponse::ServiceUnavailable().body(format!("{error:#}")),
+    }
+}
+
+/// OHLCV for one market, bucketed by slot.
+#[get("/v1/markets/{market}/candles")]
+pub async fn candles(
+    store: web::Data<Arc<dyn Store>>,
+    path: web::Path<String>,
+    query: web::Query<CandleQuery>,
+) -> impl Responder {
+    let Ok(market) = path.parse::<Pubkey>() else {
+        return HttpResponse::BadRequest().body("not a pubkey");
+    };
+    let interval = query.interval.unwrap_or(DEFAULT_INTERVAL);
+    if interval == 0 {
+        return HttpResponse::BadRequest().body("interval must be at least one slot");
+    }
+
+    match store
+        .trades(&market, range(query.from_slot, query.to_slot, MAX_HISTORY))
+        .await
+    {
+        Ok(found) => {
+            let mut aggregated = candle::aggregate(&found, interval);
+            // Bounded after aggregating, keeping the most recent: a chart wants the
+            // latest window, not the first one ever recorded.
+            if aggregated.len() > MAX_CANDLES {
+                aggregated.drain(..aggregated.len() - MAX_CANDLES);
+            }
+            let rows: Vec<Candle> = aggregated.iter().map(Candle::from).collect();
+            HttpResponse::Ok().json(rows)
+        }
+        Err(error) => HttpResponse::ServiceUnavailable().body(format!("{error:#}")),
     }
 }
