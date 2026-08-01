@@ -18,8 +18,11 @@ use tokio::sync::broadcast::error::RecvError;
 use crate::api::view::{Message, levels_of, trades_of};
 use crate::registry::{Event, Registry};
 
-/// How deep the initial snapshot goes.
-const SNAPSHOT_DEPTH: usize = 50;
+/// How deep the book goes on this feed, in the snapshot and in every update.
+///
+/// One number for both: a subscriber that received fifty levels and then started
+/// receiving fifteen would watch its ladder shrink for no reason it could see.
+const FEED_DEPTH: usize = 50;
 
 /// Opens a feed for one market.
 pub async fn stream(
@@ -45,8 +48,8 @@ pub async fn stream(
                 market: market.to_string(),
                 slot: view.slot,
                 finalized_through: view.finalized_through,
-                bids: levels_of(&view.state, Side::Bid, SNAPSHOT_DEPTH),
-                asks: levels_of(&view.state, Side::Ask, SNAPSHOT_DEPTH),
+                bids: levels_of(&view.state, Side::Bid, FEED_DEPTH),
+                asks: levels_of(&view.state, Side::Ask, FEED_DEPTH),
             };
             if send(&mut session, &snapshot).await.is_err() {
                 return;
@@ -78,9 +81,15 @@ pub async fn stream(
                             .market(&market)
                             .map(|view| view.finalized_through)
                             .unwrap_or(0);
+                        // Levels come from the state this transaction produced rather than
+                        // from the registry, which may already have moved on: a subscriber
+                        // stitching an older book onto a newer slot number would show a
+                        // book that never existed.
                         let message = Message::Update {
                             slot: derived.slot,
                             trades: trades_of(&derived.delta, finalized_through),
+                            bids: levels_of(&derived.state, Side::Bid, FEED_DEPTH),
+                            asks: levels_of(&derived.state, Side::Ask, FEED_DEPTH),
                             best_bid: derived.state.best_bid().map(|o| o.price_in_ticks().as_u64()),
                             best_ask: derived.state.best_ask().map(|o| o.price_in_ticks().as_u64()),
                             finalized_through,

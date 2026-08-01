@@ -516,7 +516,23 @@ pub enum Message {
         slot: u64,
         /// Trades it produced.
         trades: Vec<Trade>,
+        /// The book after it, best first, to the same depth as the snapshot.
+        ///
+        /// The whole top of book, not the part that changed. A client replaces rather
+        /// than patches, so it cannot drift: applying deltas correctly is a second
+        /// implementation of the book, and one that is only ever wrong after an
+        /// unpredictable sequence of updates is the hardest kind to notice.
+        ///
+        /// The cost is bandwidth — this is the largest field on the feed, and it is sent
+        /// whether or not any level moved. A consumer that only wants prints can ignore
+        /// it; one that wants more depth than this reads `/book`.
+        bids: Vec<Level>,
+        /// The ask side after it, best first.
+        asks: Vec<Level>,
         /// Best bid after it, if the side has liquidity.
+        ///
+        /// Redundant with `bids[0]` and kept because a consumer that only tracks the
+        /// touch should not have to know the level shape to find it.
         #[serde(serialize_with = "big::maybe::serialize")]
         best_bid: Option<u64>,
         /// Best ask after it, if the side has liquidity.

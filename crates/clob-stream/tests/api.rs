@@ -12,7 +12,7 @@ use clob_engine::{FeeSchedule, Market, OrderPacket, PostOnlyRejection, TraderKey
 use clob_program::state::{
     HEADER_LEN, MARKET_DISCRIMINATOR, MARKET_VERSION, MarketAccountHeader, SizeClass,
 };
-use clob_stream::api::view::{MarketSummary, TraderView, Window};
+use clob_stream::api::view::{MarketSummary, Message, TraderView, Window, levels_of};
 use clob_stream::candle;
 use clob_stream::registry::Registry;
 use clob_stream::store::StoredTrade;
@@ -282,6 +282,49 @@ fn a_seat_that_withdrew_everything_still_has_a_position() {
     assert_eq!(position.quote_lots_free, 0);
     assert_eq!(position.quote_lots_locked, 0);
     assert!(position.orders.is_empty());
+}
+
+#[test]
+fn an_update_carries_a_book_a_client_can_replace_rather_than_patch() {
+    // Without levels on the update, a subscriber's ladder is correct exactly once — at
+    // the snapshot — and then silently stops moving while trades keep printing past it.
+    // The whole top of book is sent, so a client assigns rather than applies a diff:
+    // patching is a second implementation of the book, and one that only goes wrong after
+    // some unpredictable sequence is the hardest kind to notice.
+    let mut fixture = Fixture::new();
+    let maker = fixture.seat(1, 5_000, 9_000_000);
+    fixture.rest(maker, Side::Bid, 98, 10);
+    fixture.rest(maker, Side::Ask, 102, 7);
+    let state = fixture.state();
+
+    let snapshot = Message::Snapshot {
+        market: MARKET.to_string(),
+        slot: 1,
+        finalized_through: 0,
+        bids: levels_of(&state, Side::Bid, 50),
+        asks: levels_of(&state, Side::Ask, 50),
+    };
+    let update = Message::Update {
+        slot: 2,
+        trades: Vec::new(),
+        bids: levels_of(&state, Side::Bid, 50),
+        asks: levels_of(&state, Side::Ask, 50),
+        best_bid: Some(98),
+        best_ask: Some(102),
+        finalized_through: 0,
+    };
+
+    let snapshot = serde_json::to_value(&snapshot).unwrap();
+    let update = serde_json::to_value(&update).unwrap();
+
+    // The same book described the same way, so a client has one parser for both.
+    assert_eq!(snapshot["bids"], update["bids"]);
+    assert_eq!(snapshot["asks"], update["asks"]);
+    assert_eq!(update["bids"][0]["price_in_ticks"], "98");
+    assert_eq!(update["bids"][0]["base_lots"], "10");
+    assert_eq!(update["asks"][0]["price_in_ticks"], "102");
+    assert_eq!(update["type"], "update");
+    assert_eq!(snapshot["type"], "snapshot");
 }
 
 #[test]
