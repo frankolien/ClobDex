@@ -1,4 +1,6 @@
-/target
+# Unanchored, so it matches every workspace's build output and not just the root's.
+# clob-cli and clob-stream are separate workspaces with their own target directories.
+target/
 **/*.rs.bk
 .DS_Store
 
@@ -9,5 +11,3 @@
 
 # Markets created by clob-cli, including mint keypairs.
 .clob/
-
-crates/clob-cli/target
