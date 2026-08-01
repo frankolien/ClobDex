@@ -11,16 +11,19 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use clob_client::state::MarketState;
 use clob_stream::api;
 use clob_stream::correlate::Correlator;
 use clob_stream::laserstream::{self, LaserStream};
 use clob_stream::pipeline::{self, Outcome};
 use clob_stream::registry::Registry;
+use clob_stream::snapshot::Rpc;
 use clob_stream::source::{SlotStatus, Source, Update};
 use solana_pubkey::Pubkey;
 
 fn main() -> Result<()> {
     load_dotenv();
+    install_crypto_provider()?;
 
     let program_id: Pubkey = std::env::var("CLOB_PROGRAM_ID")
         .context("CLOB_PROGRAM_ID is not set — see .env.example")?
@@ -60,8 +63,37 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
     let endpoint = laserstream::endpoint_from_env(program_id)?;
     println!("subscribing to {} at {}", program_id, endpoint.url);
 
+    // Subscribe first, then snapshot. The other order leaves a window in which a
+    // transaction lands between the two and is never seen: its account write would be
+    // missed and the next diff would report two transactions' effects as one.
     let mut source = LaserStream::connect(&endpoint)?;
     let mut correlator = Correlator::new();
+
+    // Without this, the first update for each market only establishes a baseline, so
+    // every restart silently loses the first transaction on every market.
+    match Rpc::from_env()?
+        .program_accounts(&program_id, endpoint.finalized)
+        .await
+    {
+        Ok(snapshot) => {
+            for account in &snapshot.accounts {
+                match MarketState::decode(&account.data) {
+                    Ok(state) => {
+                        correlator.seed_at(account.market, account.data.clone(), snapshot.slot);
+                        registry.seed(account.market, state, snapshot.slot);
+                        println!("seeded {} from slot {}", account.market, snapshot.slot);
+                    }
+                    // The program owns more than markets — vaults are token accounts and
+                    // will not decode. Anything else undecodable is a version skew worth
+                    // seeing, but not worth refusing to start over.
+                    Err(_) => continue,
+                }
+            }
+        }
+        // Streaming still works without a snapshot; it just loses the first transaction
+        // per market, which is the behaviour this replaced.
+        Err(error) => eprintln!("could not seed from RPC, starting cold: {error:#}"),
+    }
 
     while let Some(update) = source.next().await {
         // Slot status is acted on before correlation, because a dead slot has to reach
@@ -112,6 +144,18 @@ async fn run_ingest(registry: Arc<Registry>, program_id: Pubkey) -> Result<()> {
     }
 
     anyhow::bail!("the stream ended")
+}
+
+/// Picks the TLS backend for the whole process.
+///
+/// Two of them end up in the dependency graph — the RPC client pulls aws-lc-rs and the
+/// gRPC stack pulls ring — and rustls refuses to guess, panicking on the first
+/// connection instead. Choosing here fails at startup with a clear message rather than
+/// on a background thread mid-handshake.
+fn install_crypto_provider() -> Result<()> {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("a TLS provider was already installed"))
 }
 
 /// Loads `.env` into the environment without overwriting anything already set.

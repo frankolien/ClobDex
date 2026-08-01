@@ -30,6 +30,9 @@ clob-engine = { version = "0.1.0", path = "../clob-engine" }
 futures = "0.3.33"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+base64 = "0.23.0"
+reqwest = { version = "0.13.4", features = ["json"] }
+rustls = { version = "0.23.43", default-features = false, features = ["aws-lc-rs"] }
 
 [dev-dependencies]
 bytemuck = "1.25.2"

@@ -6,4 +6,5 @@ pub mod correlate;
 pub mod laserstream;
 pub mod pipeline;
 pub mod registry;
+pub mod snapshot;
 pub mod source;
