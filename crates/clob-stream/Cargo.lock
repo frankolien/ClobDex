@@ -779,7 +779,10 @@ dependencies = [
  "clob-engine",
  "clob-indexer",
  "clob-program",
+ "futures",
  "helius-laserstream",
+ "serde",
+ "serde_json",
  "solana-pubkey 4.1.0",
  "tokio",
 ]
