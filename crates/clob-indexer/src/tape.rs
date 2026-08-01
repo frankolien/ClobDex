@@ -20,6 +20,16 @@ pub struct Trade {
     pub maker_order_id: FIFOOrderId,
     /// Seat that owned it.
     pub maker_seat: u32,
+    /// Seat that crossed it, when the transaction names exactly one.
+    ///
+    /// `None` when the taker's seat could not be resolved, and when several takers hit
+    /// the same side in one transaction — a diff shows liquidity leaving, not which of
+    /// them took it, and there is no way to tell them apart without replaying.
+    ///
+    /// Naming the first one would be a guess, and this is the field a trader's own fill
+    /// history is built from: a wrong name there puts someone else's trade in your
+    /// history, which is worse than an unattributed one.
+    pub taker_seat: Option<u32>,
     /// Side the taker was on. A taker on the bid consumed asks.
     pub taker_side: Side,
 }

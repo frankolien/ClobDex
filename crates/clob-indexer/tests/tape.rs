@@ -348,6 +348,84 @@ fn a_transaction_that_cancels_and_takes_at_once_separates_the_two() {
 }
 
 #[test]
+fn a_fill_names_the_taker_that_caused_it() {
+    // Both sides of a fill, so a trader's own history can be built by asking for the
+    // trades where it was the maker or the taker. Without this a retail UI can only show
+    // the half of a user's activity they did not initiate.
+    let mut fixture = Fixture::new(0);
+    let maker = fixture.seat(1);
+    let taker = fixture.seat(2);
+    fixture.rest(maker, Side::Ask, 100, 10);
+
+    let packet = clob_client::instruction::market_order(Side::Bid, BaseLots(4), 8);
+    let (before, after, _) = fixture.apply(taker, packet);
+    let delta = derive(&before, &after, &[placed(packet, taker)], 1);
+
+    assert_eq!(delta.trades.len(), 1);
+    assert_eq!(delta.trades[0].maker_seat, maker);
+    assert_eq!(delta.trades[0].taker_seat, Some(taker));
+    assert_ne!(maker, taker, "otherwise the assertion above proves nothing");
+}
+
+#[test]
+fn two_takers_on_one_side_leave_the_fill_unattributed() {
+    // Liquidity leaving is all a diff sees. With two takers crossing the same side, the
+    // book cannot say which of them consumed a given order, and naming the first would
+    // file one trader's fill under the other's name.
+    let mut fixture = Fixture::new(0);
+    let maker = fixture.seat(1);
+    let first = fixture.seat(2);
+    let second = fixture.seat(3);
+    fixture.rest(maker, Side::Ask, 100, 10);
+
+    let before = fixture.snapshot();
+    let packet = clob_client::instruction::market_order(Side::Bid, BaseLots(3), 8);
+    fixture.market().place_order(first, packet, &mut ()).unwrap();
+    fixture
+        .market()
+        .place_order(second, packet, &mut ())
+        .unwrap();
+    let after = fixture.snapshot();
+
+    let delta = derive(
+        &before,
+        &after,
+        &[placed(packet, first), placed(packet, second)],
+        1,
+    );
+
+    assert_eq!(delta.trades.len(), 1, "one resting order, so one fill");
+    assert_eq!(delta.trades[0].base_lots, BaseLots(6), "both takes");
+    assert_eq!(
+        delta.trades[0].taker_seat, None,
+        "unattributed, not attributed to whichever came first"
+    );
+}
+
+#[test]
+fn a_taker_whose_seat_did_not_resolve_leaves_the_fill_unattributed() {
+    // The seat comes from the transaction's account keys, and a reader that could not
+    // resolve them says so. The volume is still real, so the trade stands — only the
+    // name is missing.
+    let mut fixture = Fixture::new(0);
+    let maker = fixture.seat(1);
+    let taker = fixture.seat(2);
+    fixture.rest(maker, Side::Ask, 100, 10);
+
+    let packet = clob_client::instruction::market_order(Side::Bid, BaseLots(4), 8);
+    let (before, after, _) = fixture.apply(taker, packet);
+    let anonymous = ObservedInstruction::anonymous(ClobInstruction::PlaceOrder {
+        packet,
+        receipt: false,
+    });
+    let delta = derive(&before, &after, &[anonymous], 1);
+
+    assert_eq!(delta.trades.len(), 1, "the fill still happened");
+    assert_eq!(delta.trades[0].base_lots, BaseLots(4));
+    assert_eq!(delta.trades[0].taker_seat, None);
+}
+
+#[test]
 fn an_untouched_market_produces_nothing() {
     let mut fixture = Fixture::new(0);
     let maker = fixture.seat(1);

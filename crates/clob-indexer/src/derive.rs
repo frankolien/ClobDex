@@ -35,6 +35,10 @@
 //! is *why* it crosses — so side alone cannot distinguish them. Getting this wrong
 //! would let anyone inflate a market's reported volume by crossing their own quotes for
 //! free, which is why [`ObservedInstruction`] carries the submitting seat.
+//!
+//! That seat has a second use: when exactly one taker crossed a side, it is also the
+//! answer to "whose fill was this", which is what a trader's own history is made of. It
+//! is recorded on the trade only when unambiguous — see [`Trade::taker_seat`].
 
 use std::collections::HashMap;
 
@@ -164,6 +168,23 @@ impl Context {
             })
     }
 
+    /// The seat that crossed liquidity leaving `side`, when the transaction names one.
+    ///
+    /// Takers are matched exactly as [`Self::consumed_by_taker`] matches them — by being
+    /// on the opposite side — but an answer is only given when every one of them is the
+    /// same known seat. One taker is the ordinary case and resolves; several are
+    /// indistinguishable in a diff, and the honest answer there is nobody.
+    fn taker_seat(&self, side: Side) -> Option<u32> {
+        let mut crossing = self
+            .takers
+            .iter()
+            .filter(|(taker_side, _)| *taker_side == side.opposite())
+            .map(|(_, seat)| *seat);
+
+        let first = crossing.next()?;
+        crossing.all(|seat| seat == first).then_some(first).flatten()
+    }
+
     fn explicitly_cancelled(&self, id: &FIFOOrderId) -> bool {
         self.cancelled_ids.contains(id)
     }
@@ -213,7 +234,10 @@ fn diff_side(
         } else {
             match context.consumed_by_taker(side, order.trader_index) {
                 Some(TakerEffect::Fill) => {
-                    delta.trades.push(trade(before, order, removed, side, slot));
+                    let taker_seat = context.taker_seat(side);
+                    delta
+                        .trades
+                        .push(trade(before, order, removed, side, slot, taker_seat));
                 }
                 Some(TakerEffect::SelfTrade) => delta.removals.push(Removal {
                     order_id: order.id,
@@ -252,6 +276,7 @@ fn trade(
     base_lots: BaseLots,
     maker_side: Side,
     slot: u64,
+    taker_seat: Option<u32>,
 ) -> Trade {
     let price = order.price_in_ticks();
     Trade {
@@ -266,6 +291,7 @@ fn trade(
             .unwrap_or(clob_book::QuoteLots::MAX),
         maker_order_id: order.id,
         maker_seat: order.trader_index,
+        taker_seat,
         taker_side: maker_side.opposite(),
     }
 }
