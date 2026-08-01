@@ -22,6 +22,7 @@ clob-client = { path = "../../crates/clob-client" }
 litesvm = "=0.15.2"
 mollusk-svm = "0.14"
 mollusk-svm-programs-token = "0.14"
+proptest.workspace = true
 spl-token = { version = "9", features = ["no-entrypoint"] }
 solana-account = "4"
 solana-instruction = "3"

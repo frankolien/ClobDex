@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc fa44f496d023b33a06ec80657cf9061fa500044d173eee0768e9abccbd209b19 # shrinks to ops = [Cancel { trader: 0, pick: 9223372036854894660 }]
+cc ec3d5e846081b752933118f0e1d10fb4f6ec4a63d0a18731803881f65c0ba955 # shrinks to ops = [Cancel { trader: 0, pick: 9223372036854775815 }]

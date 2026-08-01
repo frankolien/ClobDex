@@ -733,6 +733,7 @@ dependencies = [
  "mollusk-svm-programs-token",
  "pinocchio",
  "pinocchio-token",
+ "proptest",
  "solana-account",
  "solana-instruction",
  "solana-keypair",
