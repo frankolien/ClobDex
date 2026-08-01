@@ -45,6 +45,21 @@ book self-heals; a phantom trade never would.
 `trades_seen` and `trades_retracted` are reported separately rather than netted. Two
 published minus one retracted reads identically to one published and nothing wrong.
 
+## Backfill
+
+A restart replays the slots it missed rather than starting at the tip, so an outage
+costs latency rather than history. Verified on devnet: killing the process, trading
+twice while it was down, and restarting recovered both trades.
+
+That works because the store keeps a **checkpoint** — each market's book at a rooted
+slot — alongside the trades. Derivation diffs one book against another, so resuming needs
+the book as it stood at the resume point; trades alone are not enough.
+
+The endpoint replays and the same pipeline runs over the replayed slots. A separate
+historical decoder would be a second copy of the derivation, which is exactly the drift
+this codebase avoids. The limit is whatever history the endpoint retains — beyond that
+there is nothing to replay, and no amount of local state changes it.
+
 ## Cold starts
 
 A market's first update can only establish a baseline — deriving from it would mean
@@ -87,8 +102,9 @@ a row to delete, which a columnar store charges dearly for. The cost is that a t
 becomes durable about a second after it becomes visible, and anyone who wants the faster
 answer has the live feed, which says plainly what is still provisional.
 
-`Memory` is a complete implementation, not a stub, so persistence is optional: without
-`CLICKHOUSE_URL` everything still works, just not across a restart.
+Three backends, in order of preference: ClickHouse if `CLICKHOUSE_URL` is set, a
+directory if `STORE_PATH` is, memory otherwise. `Memory` is a complete implementation
+rather than a fallback stub, so the only thing lost by taking it is durability.
 
 ```
 curl localhost:8080/v1/markets/<market>/history?from_slot=…&to_slot=…
@@ -106,8 +122,10 @@ The ClickHouse store is **unverified against a live server** — no ClickHouse w
 reachable when it was written. Its row encoding, parsing and error handling are tested;
 its SQL and connection handling are not. `Memory` is fully tested.
 
-Backfill. The startup snapshot restores current state but not history, so a market's
-past is only as deep as whatever this process has seen since it was first pointed at it.
+History older than the endpoint's replay window. A market's past is only as deep as
+whatever this process has seen plus whatever the endpoint can still replay; reaching
+further would mean deriving from transaction history, which needs a second derivation
+path this deliberately does not have.
 
 ## License
 
