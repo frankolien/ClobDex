@@ -3,4 +3,5 @@
 pub mod attribute;
 pub mod correlate;
 pub mod pipeline;
+pub mod registry;
 pub mod source;
