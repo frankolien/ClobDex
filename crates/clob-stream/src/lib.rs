@@ -8,3 +8,4 @@ pub mod pipeline;
 pub mod registry;
 pub mod snapshot;
 pub mod source;
+pub mod store;

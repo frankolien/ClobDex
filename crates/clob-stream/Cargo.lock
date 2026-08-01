@@ -802,6 +802,7 @@ dependencies = [
  "actix-web",
  "actix-ws",
  "anyhow",
+ "async-trait",
  "base64 0.23.0",
  "bytemuck",
  "clob-book",
