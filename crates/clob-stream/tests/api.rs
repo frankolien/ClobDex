@@ -12,8 +12,10 @@ use clob_engine::{FeeSchedule, Market, OrderPacket, PostOnlyRejection, TraderKey
 use clob_program::state::{
     HEADER_LEN, MARKET_DISCRIMINATOR, MARKET_VERSION, MarketAccountHeader, SizeClass,
 };
-use clob_stream::api::view::MarketSummary;
+use clob_stream::api::view::{MarketSummary, Window};
+use clob_stream::candle;
 use clob_stream::registry::Registry;
+use clob_stream::store::StoredTrade;
 use solana_pubkey::Pubkey;
 
 type TestMarket = Market<128, 128, 32>;
@@ -166,6 +168,111 @@ fn a_one_sided_book_reports_the_side_it_has_and_no_spread() {
     assert_eq!(summary.best_ask_in_ticks, None);
     assert_eq!(summary.spread_in_ticks, None);
     assert_eq!(summary.mid_price_in_ticks, None);
+}
+
+/// A stored fill, for the window projections.
+fn stored(slot: u64, price: u64, size: u64) -> StoredTrade {
+    StoredTrade {
+        market: MARKET,
+        slot,
+        signature: [slot as u8; 64],
+        price_in_ticks: price,
+        base_lots: size,
+        quote_lots: price * size,
+        maker_seat: 1,
+        taker_seat: Some(2),
+        maker_order_sequence: slot,
+        taker_side_is_bid: true,
+    }
+}
+
+#[test]
+fn a_window_reports_the_range_the_volume_and_the_change() {
+    let trades = [
+        stored(10, 100, 3),
+        stored(20, 130, 1),
+        stored(30, 90, 2),
+        stored(40, 110, 4),
+    ];
+    let window = Window::new(&MARKET, 1, 40, &trades, false);
+
+    assert_eq!(window.from_slot, 1);
+    assert_eq!(window.to_slot, 40);
+    assert_eq!(window.slots, 40, "both ends are inclusive");
+
+    assert_eq!(window.open_in_ticks, Some(100), "first trade, not lowest");
+    assert_eq!(window.close_in_ticks, Some(110), "last trade, not highest");
+    assert_eq!(window.high_in_ticks, Some(130));
+    assert_eq!(window.low_in_ticks, Some(90));
+    assert_eq!(window.change_in_ticks, Some(10));
+
+    assert_eq!(window.base_lots, 10);
+    assert_eq!(window.quote_lots, 300 + 130 + 180 + 440);
+    assert_eq!(window.trades, 4);
+    assert!(!window.truncated);
+}
+
+#[test]
+fn a_window_on_a_falling_market_reports_a_negative_change() {
+    // The reason the field is signed. An unsigned change would wrap a fall into an
+    // enormous rise, which is the single most misleading number a markets table can show.
+    let trades = [stored(10, 120, 1), stored(20, 80, 1)];
+    let window = Window::new(&MARKET, 1, 20, &trades, false);
+
+    assert_eq!(window.change_in_ticks, Some(-40));
+}
+
+#[test]
+fn a_window_with_no_trades_reports_no_price_and_no_volume() {
+    let window = Window::new(&MARKET, 1, 216_000, &[], false);
+
+    assert_eq!(window.open_in_ticks, None);
+    assert_eq!(window.close_in_ticks, None);
+    assert_eq!(window.change_in_ticks, None);
+    assert_eq!(window.vwap_in_ticks, None);
+    assert_eq!(window.base_lots, 0);
+    assert_eq!(window.quote_lots, 0);
+    assert_eq!(window.trades, 0);
+}
+
+#[test]
+fn a_window_agrees_with_a_candle_covering_the_same_trades() {
+    // The window reuses the candle aggregation rather than folding trades a second time.
+    // This is the claim that makes that worth doing: open, close, high and low mean the
+    // same thing in a rolling statistic as they do in a bar on a chart.
+    let trades = [
+        stored(10, 100, 3),
+        stored(11, 130, 1),
+        stored(12, 90, 2),
+        stored(13, 110, 4),
+    ];
+    let bars = candle::aggregate(&trades, 1_000);
+    assert_eq!(bars.len(), 1, "all four fall in one bucket");
+
+    let window = Window::new(&MARKET, 0, 999, &trades, false);
+    assert_eq!(window.open_in_ticks, Some(bars[0].open));
+    assert_eq!(window.high_in_ticks, Some(bars[0].high));
+    assert_eq!(window.low_in_ticks, Some(bars[0].low));
+    assert_eq!(window.close_in_ticks, Some(bars[0].close));
+    assert_eq!(window.base_lots, bars[0].base_lots);
+    assert_eq!(window.quote_lots, bars[0].quote_lots);
+    assert_eq!(window.trades, bars[0].trades);
+}
+
+#[test]
+fn a_window_collapses_trades_from_slots_far_apart_into_one() {
+    // The bucketing that `aggregate` does must not survive into a window: slots 1 and
+    // 300,000 belong to the same 24-hour statistic and to different bars.
+    let trades = [stored(1, 100, 1), stored(300_000, 200, 1)];
+    let summary = candle::summarise(&trades).expect("two trades summarise");
+
+    assert_eq!(summary.trades, 2);
+    assert_eq!(summary.open, 100);
+    assert_eq!(summary.close, 200);
+    assert!(
+        candle::aggregate(&trades, 1_000).len() > 1,
+        "the same trades are several bars"
+    );
 }
 
 #[test]

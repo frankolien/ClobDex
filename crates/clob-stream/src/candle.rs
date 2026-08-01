@@ -77,6 +77,23 @@ pub fn aggregate(trades: &[StoredTrade], interval: u64) -> Vec<Candle> {
     candles
 }
 
+/// Collapses every trade into one bucket, whatever slots they came from.
+///
+/// A window is a candle whose boundaries the caller chose rather than the interval. Built
+/// by [`aggregate`] rather than beside it so that open, close, high and low mean the same
+/// thing in a 24-hour statistic as they do in a one-minute bar — two folds that agree
+/// today would not stay agreeing.
+///
+/// The interval is [`u64::MAX`], which puts every slot below it in bucket zero. That is
+/// every slot that can exist: a slot equal to `u64::MAX` would need the chain to have
+/// produced 2^64 of them.
+///
+/// `None` when nothing traded. A window with no trades has no open and no close, and
+/// zeroes there read as a market that printed at zero.
+pub fn summarise(trades: &[StoredTrade]) -> Option<Candle> {
+    aggregate(trades, u64::MAX).pop()
+}
+
 /// Volume-weighted average price across a set of trades, in ticks.
 ///
 /// `None` when nothing traded — a VWAP of zero would read as a real price of zero.

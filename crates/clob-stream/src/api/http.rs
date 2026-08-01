@@ -12,7 +12,9 @@ use actix_web::{HttpResponse, Responder, get, web};
 use clob_book::Side;
 use solana_pubkey::Pubkey;
 
-use crate::api::view::{Book, Candle, Health, HistoricalTrade, MarketSummary, Trade, levels_of};
+use crate::api::view::{
+    Book, Candle, Health, HistoricalTrade, MarketSummary, Trade, Window, levels_of,
+};
 use crate::candle;
 use crate::registry::Registry;
 use crate::store::{Range, Store};
@@ -139,11 +141,33 @@ const MAX_CANDLES: usize = 1_000;
 /// Trades one history request may scan.
 const MAX_HISTORY: usize = 10_000;
 
+/// Slots a window covers when the caller does not say.
+///
+/// About twenty-four hours, at four hundred milliseconds a slot. This is the only
+/// wall-clock assumption in the crate, and it is a default rather than a conversion:
+/// nothing stored or returned is in seconds, so being wrong about slot times moves which
+/// trades a caller asked for and never what any of them says. Everything else stays
+/// slot-native for the reason [`candle`](crate::candle) gives — block times drift, and a
+/// boundary that moves is worse than one measured in an odd unit.
+const DEFAULT_WINDOW_SLOTS: u64 = 216_000;
+
+/// Trades one window may aggregate.
+///
+/// Larger than a history page because a window is a total rather than a listing, and a
+/// total assembled from a tenth of the trades is wrong rather than short. A span busy
+/// enough to exceed this says so — see [`Window::truncated`](crate::api::view::Window).
+const MAX_WINDOW_TRADES: usize = 100_000;
+
 #[derive(serde::Deserialize)]
 pub struct HistoryQuery {
     from_slot: Option<u64>,
     to_slot: Option<u64>,
     limit: Option<usize>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct WindowQuery {
+    slots: Option<u64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -186,6 +210,49 @@ pub async fn history(
         }
         // A store that is down is a 503, not a 200 with an empty list — the difference
         // between "nothing traded" and "we cannot tell" matters to whoever is asking.
+        Err(error) => HttpResponse::ServiceUnavailable().body(format!("{error:#}")),
+    }
+}
+
+/// What one market traded over the last `slots` slots.
+///
+/// The rolling statistic a markets table and a landing page want — volume, range, and
+/// change — kept off `/v1/markets` because it costs a query per market and that endpoint
+/// costs none.
+///
+/// The span ends at the last slot this process has processed for the market, not at the
+/// chain tip: those differ while the indexer is catching up, and measuring to a tip whose
+/// trades have not been read yet would report a lull that is really a backlog.
+#[get("/v1/markets/{market}/window")]
+pub async fn window(
+    registry: web::Data<Registry>,
+    store: web::Data<Arc<dyn Store>>,
+    path: web::Path<String>,
+    query: web::Query<WindowQuery>,
+) -> impl Responder {
+    let Ok(market) = path.parse::<Pubkey>() else {
+        return HttpResponse::BadRequest().body("not a pubkey");
+    };
+    let Some(view) = registry.market(&market) else {
+        return HttpResponse::NotFound().body("market not tracked");
+    };
+
+    // At least one slot: a zero-slot window is a span containing nothing, and answering
+    // it with the whole history would be the opposite of what was asked.
+    let slots = query.slots.unwrap_or(DEFAULT_WINDOW_SLOTS).max(1);
+    let to_slot = view.slot;
+    let from_slot = to_slot.saturating_sub(slots - 1);
+
+    let range = Range {
+        from_slot,
+        to_slot,
+        limit: MAX_WINDOW_TRADES,
+    };
+    match store.trades(&market, range).await {
+        Ok(found) => {
+            let truncated = found.len() >= MAX_WINDOW_TRADES;
+            HttpResponse::Ok().json(Window::new(&market, from_slot, to_slot, &found, truncated))
+        }
         Err(error) => HttpResponse::ServiceUnavailable().body(format!("{error:#}")),
     }
 }

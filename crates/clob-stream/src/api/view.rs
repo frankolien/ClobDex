@@ -197,6 +197,89 @@ impl MarketSummary {
     }
 }
 
+/// What traded over a span of slots.
+///
+/// Measured in slots, not hours. A trade carries a slot; turning that into a wall clock
+/// means trusting block times, which drift and are occasionally revised (see
+/// [`candle`](crate::candle)). The span a caller asks for is the span it gets, and the
+/// only place a "24 hours is about this many slots" assumption exists is the default the
+/// handler applies — written down, once, rather than baked into the numbers.
+///
+/// Prices are absent rather than zero when nothing traded in the span, which is the
+/// ordinary state of a quiet market.
+#[derive(Serialize)]
+pub struct Window {
+    /// The market.
+    pub market: String,
+    /// Lowest slot included.
+    pub from_slot: u64,
+    /// Highest slot included. Both ends are inclusive.
+    pub to_slot: u64,
+    /// Slots the span covers.
+    pub slots: u64,
+    /// Price of the first trade in the span.
+    pub open_in_ticks: Option<u64>,
+    /// Highest price traded.
+    pub high_in_ticks: Option<u64>,
+    /// Lowest price traded.
+    pub low_in_ticks: Option<u64>,
+    /// Price of the last trade in the span.
+    pub close_in_ticks: Option<u64>,
+    /// Close minus open. Signed, because a market can fall.
+    pub change_in_ticks: Option<i64>,
+    /// Volume-weighted average price.
+    pub vwap_in_ticks: Option<u64>,
+    /// Total size traded, in base lots.
+    pub base_lots: u64,
+    /// Total gross value traded, in quote lots.
+    pub quote_lots: u64,
+    /// How many fills went into it.
+    pub trades: u64,
+    /// Whether the span held more trades than one query may read.
+    ///
+    /// When true, everything above describes only the most recent trades in the span, so
+    /// the volume is a floor and the open is not the span's open. Reported rather than
+    /// hidden: a truncated total is indistinguishable from a real one, and a venue
+    /// under-reporting its own volume without saying so is still misreporting it.
+    pub truncated: bool,
+}
+
+impl Window {
+    /// Summarises the trades a span returned.
+    ///
+    /// `trades` must be what the store returned for exactly this span, oldest first.
+    pub fn new(
+        market: &solana_pubkey::Pubkey,
+        from_slot: u64,
+        to_slot: u64,
+        trades: &[crate::store::StoredTrade],
+        truncated: bool,
+    ) -> Self {
+        let candle = crate::candle::summarise(trades);
+        Self {
+            market: market.to_string(),
+            from_slot,
+            to_slot,
+            slots: to_slot.saturating_sub(from_slot).saturating_add(1),
+            open_in_ticks: candle.as_ref().map(|c| c.open),
+            high_in_ticks: candle.as_ref().map(|c| c.high),
+            low_in_ticks: candle.as_ref().map(|c| c.low),
+            close_in_ticks: candle.as_ref().map(|c| c.close),
+            // Through i128 so the subtraction cannot wrap before it is narrowed. Two u64
+            // prices can differ by more than an i64 holds; a change that large is not a
+            // real market, and reporting nothing beats reporting a negative rally.
+            change_in_ticks: candle
+                .as_ref()
+                .and_then(|c| i64::try_from(i128::from(c.close) - i128::from(c.open)).ok()),
+            vwap_in_ticks: crate::candle::vwap(trades),
+            base_lots: candle.as_ref().map(|c| c.base_lots).unwrap_or(0),
+            quote_lots: candle.as_ref().map(|c| c.quote_lots).unwrap_or(0),
+            trades: candle.as_ref().map(|c| c.trades).unwrap_or(0),
+            truncated,
+        }
+    }
+}
+
 /// Liveness, and whether the derivation still agrees with the chain.
 #[derive(Serialize)]
 pub struct Health {

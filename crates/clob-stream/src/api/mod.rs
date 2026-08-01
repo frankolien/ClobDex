@@ -32,6 +32,7 @@ pub async fn serve(
             .service(http::health)
             .service(http::history)
             .service(http::candles)
+            .service(http::window)
             .route("/v1/markets/{market}/stream", web::get().to(ws::stream))
     })
     .bind(bind)?
