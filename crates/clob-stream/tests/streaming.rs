@@ -16,7 +16,7 @@ use clob_program::state::{
     HEADER_LEN, MARKET_DISCRIMINATOR, MARKET_VERSION, MarketAccountHeader, SizeClass,
 };
 use clob_stream::correlate::{Correlator, PENDING_CAPACITY};
-use clob_stream::pipeline;
+use clob_stream::pipeline::{self, Outcome};
 use clob_stream::source::{RawInstruction, Source, Update};
 use solana_pubkey::Pubkey;
 
@@ -118,7 +118,7 @@ fn cross(taker: Pubkey, packet: OrderPacket, chain: &mut Chain) -> (Vec<u8>, Vec
         .index_of(&TraderKey(taker.to_bytes()));
     chain
         .market_mut()
-        .place_order(seat, packet.clone(), &mut truth)
+        .place_order(seat, packet, &mut truth)
         .unwrap();
     let after = chain.bytes();
     (before, after, order_instruction(taker, &packet), truth)
@@ -170,7 +170,9 @@ fn a_fill_between_two_wallets_is_derived_from_the_bytes_alone() {
         })
         .expect("the pair completed");
 
-    let derived = pipeline::process(&change, &PROGRAM).unwrap().unwrap();
+    let Outcome::Derived(derived) = pipeline::process(&change, &PROGRAM).unwrap() else {
+        panic!("expected a derived change");
+    };
     let trades: Vec<(u64, u64)> = derived
         .delta
         .trades
@@ -224,7 +226,9 @@ fn a_self_trade_is_not_reported_as_volume() {
         })
         .expect("the pair completed");
 
-    let derived = pipeline::process(&change, &PROGRAM).unwrap().unwrap();
+    let Outcome::Derived(derived) = pipeline::process(&change, &PROGRAM).unwrap() else {
+        panic!("expected a derived change");
+    };
     assert!(
         derived.delta.trades.is_empty(),
         "a self-trade must never be reported as volume: {:?}",
@@ -289,9 +293,14 @@ fn the_first_update_for_a_market_only_establishes_a_baseline() {
         .expect("a change is produced");
 
     assert!(change.before.is_none(), "there was nothing to diff against");
+    // The market is still reported, so it becomes visible before it has traded — but
+    // nothing is derived from a state with nothing to compare it to.
     assert!(
-        pipeline::process(&change, &PROGRAM).unwrap().is_none(),
-        "and so nothing is derived from it"
+        matches!(
+            pipeline::process(&change, &PROGRAM),
+            Err(_) | Ok(Outcome::Baseline { .. })
+        ),
+        "a first sighting is a baseline, never a derived change"
     );
 }
 

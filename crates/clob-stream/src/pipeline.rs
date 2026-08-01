@@ -27,25 +27,48 @@ pub struct Derived {
     pub state: MarketState,
 }
 
+/// What came of processing one change.
+///
+/// Two outcomes rather than an `Option`, because "there was nothing to diff against" and
+/// "nothing happened" are different facts and the caller must treat them differently: a
+/// baseline still has to be recorded, or the market stays invisible until its second
+/// transaction.
+#[derive(Clone, Debug)]
+pub enum Outcome {
+    /// First sighting of a market. Its state is now known; nothing was derived.
+    Baseline {
+        /// Which market.
+        market: Pubkey,
+        /// Slot the state came from.
+        slot: u64,
+        /// The market as it stands.
+        state: MarketState,
+    },
+    /// A change that could be diffed against a known earlier state.
+    Derived(Derived),
+}
+
 /// Derives what one change did.
 ///
-/// Returns `None` when there is no earlier state to diff against — the first update for
-/// a market establishes a baseline and nothing more. Reporting the whole book as newly
-/// posted in that case would publish a burst of fictional activity every restart.
-pub fn process(change: &Change, program_id: &Pubkey) -> Result<Option<Derived>> {
-    // Checked before either decode: with no baseline there is nothing to derive, and
-    // reporting a decode failure for a state nobody was going to diff would turn a
-    // no-op into an error.
+/// The first update for a market yields [`Outcome::Baseline`]: there is nothing to diff
+/// against, and reporting the whole resting book as newly posted would publish a burst
+/// of fictional activity on every restart.
+pub fn process(change: &Change, program_id: &Pubkey) -> Result<Outcome> {
+    let after = MarketState::decode(&change.after)
+        .map_err(|e| anyhow::anyhow!("{e:?}"))
+        .context("decoding the market after the transaction")?;
+
     let Some(before_bytes) = &change.before else {
-        return Ok(None);
+        return Ok(Outcome::Baseline {
+            market: change.market,
+            slot: change.slot,
+            state: after,
+        });
     };
 
     let before = MarketState::decode(before_bytes)
         .map_err(|e| anyhow::anyhow!("{e:?}"))
         .context("decoding the market before the transaction")?;
-    let after = MarketState::decode(&change.after)
-        .map_err(|e| anyhow::anyhow!("{e:?}"))
-        .context("decoding the market after the transaction")?;
 
     // Attribution reads the earlier state: a seat claimed in this transaction owned none
     // of the liquidity it consumed.
@@ -57,7 +80,7 @@ pub fn process(change: &Change, program_id: &Pubkey) -> Result<Option<Derived>> 
         .collect();
 
     let delta = derive(&before, &after, &observed, change.slot);
-    Ok(Some(Derived {
+    Ok(Outcome::Derived(Derived {
         market: change.market,
         slot: change.slot,
         signature: change.signature,
