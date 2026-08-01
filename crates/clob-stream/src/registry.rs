@@ -188,6 +188,23 @@ impl Registry {
             .cloned()
     }
 
+    /// Reads something out of every tracked market, without copying any of them.
+    ///
+    /// The mapping runs under the read lock rather than cloning the views out first. A
+    /// [`MarketView`] owns its entire book and seat table, so duplicating every one of
+    /// them to read a handful of numbers off each would make listing markets the most
+    /// expensive call in the API — and it is the one a landing page makes most often.
+    ///
+    /// `f` must not block, for the usual reason: it runs with ingest locked out.
+    pub fn map_markets<T>(&self, f: impl Fn(&Pubkey, &MarketView) -> T) -> Vec<T> {
+        self.markets
+            .read()
+            .expect("registry lock poisoned")
+            .iter()
+            .map(|(market, view)| f(market, view))
+            .collect()
+    }
+
     /// Every market being tracked.
     pub fn markets(&self) -> Vec<Pubkey> {
         self.markets

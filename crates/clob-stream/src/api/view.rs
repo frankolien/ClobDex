@@ -88,6 +88,115 @@ impl Trade {
     }
 }
 
+/// The tick and lot geometry a client needs to render any of these numbers.
+///
+/// Carried on the summary so a market list does not need one account fetch per row just
+/// to turn ticks into a price. It is immutable after market creation, so a client can
+/// cache it for as long as it keeps the address.
+#[derive(Serialize)]
+pub struct Lots {
+    /// Base lots per whole base unit.
+    pub base_lots_per_base_unit: u64,
+    /// One tick, in quote lots per base unit.
+    pub tick_size_in_quote_lots_per_base_unit: u64,
+    /// Base-token atoms per base lot.
+    pub base_atoms_per_base_lot: u64,
+    /// Quote-token atoms per quote lot.
+    pub quote_atoms_per_quote_lot: u64,
+}
+
+impl From<&clob_book::LotConfig> for Lots {
+    fn from(config: &clob_book::LotConfig) -> Self {
+        Self {
+            base_lots_per_base_unit: config.base_lots_per_base_unit,
+            tick_size_in_quote_lots_per_base_unit: config.tick_size_in_quote_lots_per_base_unit,
+            base_atoms_per_base_lot: config.base_atoms_per_base_lot,
+            quote_atoms_per_quote_lot: config.quote_atoms_per_quote_lot,
+        }
+    }
+}
+
+/// One market, as a list or a landing page wants it.
+///
+/// Everything here is read from state already in memory, so serving every tracked market
+/// costs no queries. Rolling volume is deliberately absent for that reason — it needs the
+/// store, and putting it here would make the cheapest endpoint the most expensive one.
+/// It lives on [`Window`] behind a route that asks for it.
+///
+/// The optional prices are `None` on an empty or one-sided book, which is a real state
+/// for a new market and not an error. A client that renders `null` as zero will draw a
+/// market trading at zero.
+#[derive(Serialize)]
+pub struct MarketSummary {
+    /// The market account.
+    pub market: String,
+    /// Slot the book state came from.
+    pub slot: u64,
+    /// Everything at or below this slot is rooted.
+    pub finalized_through: u64,
+    /// Base token mint.
+    pub base_mint: String,
+    /// Quote token mint.
+    pub quote_mint: String,
+    /// Taker fee, in basis points.
+    pub taker_fee_bps: u64,
+    /// Tick and lot geometry.
+    pub lots: Lots,
+    /// Best bid, if the side has liquidity.
+    pub best_bid_in_ticks: Option<u64>,
+    /// Best ask, if the side has liquidity.
+    pub best_ask_in_ticks: Option<u64>,
+    /// Ask minus bid, when both sides have liquidity.
+    pub spread_in_ticks: Option<u64>,
+    /// Midpoint, when both sides have liquidity.
+    pub mid_price_in_ticks: Option<u64>,
+    /// Price of the most recent trade this process has seen, if it has seen one.
+    ///
+    /// From the in-memory tape, so it is empty after a restart until something trades —
+    /// unlike the book, which is restored from a checkpoint. A client that needs a last
+    /// price across restarts should read it from the history endpoint.
+    pub last_price_in_ticks: Option<u64>,
+    /// Resting orders on the bid.
+    pub bid_orders: usize,
+    /// Resting orders on the ask.
+    pub ask_orders: usize,
+    /// Base lots the market holds for all seats.
+    pub base_lots_deposited: u64,
+    /// Quote lots the market holds for all seats, including unclaimed fees.
+    pub quote_lots_deposited: u64,
+    /// Seats claimed.
+    pub seats: usize,
+    /// Trades this process has seen for the market.
+    pub trades_seen: u64,
+}
+
+impl MarketSummary {
+    /// Summarises one tracked market.
+    pub fn new(market: &solana_pubkey::Pubkey, view: &crate::registry::MarketView) -> Self {
+        let state = &view.state;
+        Self {
+            market: market.to_string(),
+            slot: view.slot,
+            finalized_through: view.finalized_through,
+            base_mint: solana_pubkey::Pubkey::new_from_array(state.account.base_mint).to_string(),
+            quote_mint: solana_pubkey::Pubkey::new_from_array(state.account.quote_mint).to_string(),
+            taker_fee_bps: state.fees().taker_fee_bps,
+            lots: Lots::from(state.lot_config()),
+            best_bid_in_ticks: state.best_bid().map(|o| o.price_in_ticks().as_u64()),
+            best_ask_in_ticks: state.best_ask().map(|o| o.price_in_ticks().as_u64()),
+            spread_in_ticks: state.spread_in_ticks(),
+            mid_price_in_ticks: state.mid_price_in_ticks(),
+            last_price_in_ticks: view.tape.last().map(|t| t.price_in_ticks.as_u64()),
+            bid_orders: state.bids.len(),
+            ask_orders: state.asks.len(),
+            base_lots_deposited: state.header.base_lots_deposited.as_u64(),
+            quote_lots_deposited: state.header.quote_lots_deposited.as_u64(),
+            seats: state.traders.len(),
+            trades_seen: view.trades_seen,
+        }
+    }
+}
+
 /// Liveness, and whether the derivation still agrees with the chain.
 #[derive(Serialize)]
 pub struct Health {

@@ -12,7 +12,7 @@ use actix_web::{HttpResponse, Responder, get, web};
 use clob_book::Side;
 use solana_pubkey::Pubkey;
 
-use crate::api::view::{Book, Candle, Health, HistoricalTrade, Trade, levels_of};
+use crate::api::view::{Book, Candle, Health, HistoricalTrade, MarketSummary, Trade, levels_of};
 use crate::candle;
 use crate::registry::Registry;
 use crate::store::{Range, Store};
@@ -41,11 +41,15 @@ pub struct LimitQuery {
     limit: Option<usize>,
 }
 
-/// Every market being tracked.
+/// Every market being tracked, summarised.
+///
+/// Returns enough to render a markets table or a landing page — price, spread, depth,
+/// what the market holds, and the lot geometry needed to format any of it — without a
+/// follow-up call per row. Everything comes from memory; rolling volume is on
+/// `/v1/markets/{market}/window`, which costs a query and so is not folded in here.
 #[get("/v1/markets")]
 pub async fn markets(registry: web::Data<Registry>) -> impl Responder {
-    let markets: Vec<String> = registry.markets().iter().map(Pubkey::to_string).collect();
-    HttpResponse::Ok().json(markets)
+    HttpResponse::Ok().json(registry.map_markets(MarketSummary::new))
 }
 
 /// One market's book.
