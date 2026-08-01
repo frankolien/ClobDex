@@ -77,18 +77,37 @@ market's fee counter is written by the program; the trades are derived independe
 the book. If the two disagree, the derivation invented, missed, or mispriced a fill — and
 that is worth alerting on rather than serving quietly.
 
+## Persistence
+
+Nothing is written until its slot is rooted.
+
+That one rule is what makes the store append-only: a retraction can only ever target a
+slot still at `confirmed`, and such a trade has not been written yet — so there is never
+a row to delete, which a columnar store charges dearly for. The cost is that a trade
+becomes durable about a second after it becomes visible, and anyone who wants the faster
+answer has the live feed, which says plainly what is still provisional.
+
+`Memory` is a complete implementation, not a stub, so persistence is optional: without
+`CLICKHOUSE_URL` everything still works, just not across a restart.
+
+```
+curl localhost:8080/v1/markets/<market>/history?from_slot=…&to_slot=…
+curl localhost:8080/v1/markets/<market>/candles?interval=150
+```
+
+Candles are bucketed by slot rather than wall clock — a slot is what a trade carries,
+and block times drift. Aggregation is Rust rather than a SQL `GROUP BY`, because a
+rollup would be a second copy of the logic; if it ever becomes the bottleneck, the Rust
+version stays as the reference to test it against.
+
 ## Not built yet
 
-Persistence. Everything is in memory, so a restart replays from the endpoint's tip and
-the tape starts empty. Candles, historical queries, and anything a database is for belong
-behind a writer this crate does not have.
+The ClickHouse store is **unverified against a live server** — no ClickHouse was
+reachable when it was written. Its row encoding, parsing and error handling are tested;
+its SQL and connection handling are not. `Memory` is fully tested.
 
-That also bounds rollback handling: a retraction can only correct a trade still held in
-memory. Once a slot has aged out of the tape, nothing here can take it back — which is
-another reason the store is the next thing to build.
-
-The startup snapshot restores current state but not history, so the tape still begins
-empty on every restart.
+Backfill. The startup snapshot restores current state but not history, so a market's
+past is only as deep as whatever this process has seen since it was first pointed at it.
 
 ## License
 
