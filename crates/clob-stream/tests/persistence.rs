@@ -38,6 +38,7 @@ fn stored(slot: u64, price: u64, size: u64) -> StoredTrade {
         base_lots: size,
         quote_lots: price * size,
         maker_seat: 1,
+        maker_order_sequence: slot,
         taker_side_is_bid: true,
     }
 }
@@ -172,8 +173,8 @@ async fn two_fills_in_one_transaction_are_both_kept() {
     let mut first = stored(10, 100, 5);
     let mut second = stored(10, 101, 5);
     second.signature = first.signature;
-    first.maker_seat = 1;
-    second.maker_seat = 2;
+    first.maker_order_sequence = 1;
+    second.maker_order_sequence = 2;
 
     store.append(&[first, second]).await.unwrap();
     assert_eq!(store.len(), 2);
@@ -406,4 +407,21 @@ fn resuming_starts_from_the_oldest_checkpoint() {
     let oldest = checkpoints.iter().copied().min().unwrap();
 
     assert_eq!(oldest, 400);
+}
+
+#[tokio::test]
+async fn two_identical_looking_fills_in_one_transaction_are_both_kept() {
+    // A maker resting two orders of the same size at the same price is ordinary — quote
+    // refreshing produces it constantly. A taker sweeping both fills them in one
+    // transaction, so the two rows differ in nothing except which order was hit.
+    //
+    // Deduplicating without the order id silently drops one and under-reports volume.
+    let store = Memory::new();
+    let mut first = stored(10, 100, 5);
+    let mut second = stored(10, 100, 5);
+    first.maker_order_sequence = 1;
+    second.maker_order_sequence = 2;
+
+    store.append(&[first, second]).await.unwrap();
+    assert_eq!(store.len(), 2, "two distinct orders, two trades");
 }

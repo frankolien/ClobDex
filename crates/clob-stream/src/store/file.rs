@@ -43,6 +43,7 @@ struct TradeRow {
     base_lots: u64,
     quote_lots: u64,
     maker_seat: u32,
+    maker_order_sequence: u64,
     taker_side_is_bid: bool,
 }
 
@@ -75,6 +76,7 @@ impl TradeRow {
             base_lots: trade.base_lots,
             quote_lots: trade.quote_lots,
             maker_seat: trade.maker_seat,
+            maker_order_sequence: trade.maker_order_sequence,
             taker_side_is_bid: trade.taker_side_is_bid,
         }
     }
@@ -91,6 +93,7 @@ impl TradeRow {
             base_lots: self.base_lots,
             quote_lots: self.quote_lots,
             maker_seat: self.maker_seat,
+            maker_order_sequence: self.maker_order_sequence,
             taker_side_is_bid: self.taker_side_is_bid,
         })
     }

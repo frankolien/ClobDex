@@ -71,6 +71,7 @@ impl Pending {
                 base_lots: trade.base_lots.as_u64(),
                 quote_lots: trade.quote_lots.as_u64(),
                 maker_seat: trade.maker_seat,
+                maker_order_sequence: trade.maker_order_id.sequence_number(),
                 taker_side_is_bid: trade.taker_side == clob_book::Side::Bid,
             }));
     }

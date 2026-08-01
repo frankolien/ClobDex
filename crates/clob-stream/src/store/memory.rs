@@ -50,14 +50,16 @@ impl Store for Memory {
         for trade in trades {
             let market = all.entry(trade.market).or_default();
             // Idempotent on the same trade arriving twice, which a reconnect can cause
-            // by replaying a slot that was already flushed. A store that deduplicated
-            // only on signature would drop the other fills in a multi-fill transaction.
+            // by replaying a slot that was already flushed.
+            //
+            // Keyed on the maker's order id, because that is the only thing that always
+            // differs between two fills in one transaction. Size and price do not: a
+            // maker refreshing quotes rests several identical orders, and a taker
+            // sweeping them produces rows alike in everything else.
             let duplicate = market.iter().any(|existing| {
                 existing.signature == trade.signature
                     && existing.slot == trade.slot
-                    && existing.maker_seat == trade.maker_seat
-                    && existing.price_in_ticks == trade.price_in_ticks
-                    && existing.base_lots == trade.base_lots
+                    && existing.maker_order_sequence == trade.maker_order_sequence
             });
             if !duplicate {
                 market.push(trade.clone());

@@ -68,9 +68,10 @@ impl ClickHouse {
                 base_lots    UInt64,
                 quote_lots   UInt64,
                 maker_seat   UInt32,
+                maker_order  UInt64,
                 taker_is_bid UInt8
              ) ENGINE = ReplacingMergeTree()
-             ORDER BY (market, slot, signature, maker_seat, price_in_ticks, base_lots)",
+             ORDER BY (market, slot, signature, maker_order)",
             self.database
         ))
         .await?;
@@ -142,7 +143,7 @@ fn unhex(text: &str) -> Option<[u8; 64]> {
 /// `String` column taking arbitrary input would need quoting.
 fn row(trade: &StoredTrade) -> String {
     format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         trade.market,
         trade.slot,
         hex(&trade.signature),
@@ -150,6 +151,7 @@ fn row(trade: &StoredTrade) -> String {
         trade.base_lots,
         trade.quote_lots,
         trade.maker_seat,
+        trade.maker_order_sequence,
         u8::from(trade.taker_side_is_bid),
     )
 }
@@ -176,7 +178,7 @@ impl Store for ClickHouse {
         let body = self
             .execute(&format!(
                 "SELECT market, slot, signature, price_in_ticks, base_lots, quote_lots,
-                        maker_seat, taker_is_bid
+                        maker_seat, maker_order, taker_is_bid
                  FROM {}.{TABLE} FINAL
                  WHERE market = '{market}' AND slot >= {} AND slot <= {}
                  ORDER BY slot ASC
@@ -262,8 +264,8 @@ impl Store for ClickHouse {
 
 fn parse(line: &str) -> Result<StoredTrade> {
     let fields: Vec<&str> = line.split('\t').collect();
-    if fields.len() != 8 {
-        bail!("expected 8 columns, got {}: {line}", fields.len());
+    if fields.len() != 9 {
+        bail!("expected 9 columns, got {}: {line}", fields.len());
     }
     let number = |index: usize| -> Result<u64> {
         fields[index]
@@ -279,7 +281,8 @@ fn parse(line: &str) -> Result<StoredTrade> {
         base_lots: number(4)?,
         quote_lots: number(5)?,
         maker_seat: number(6)? as u32,
-        taker_side_is_bid: number(7)? != 0,
+        maker_order_sequence: number(7)?,
+        taker_side_is_bid: number(8)? != 0,
     })
 }
 
@@ -296,6 +299,7 @@ mod tests {
             base_lots: 25,
             quote_lots: 3_750_000,
             maker_seat: 4,
+            maker_order_sequence: 991,
             taker_side_is_bid: true,
         }
     }
@@ -313,7 +317,7 @@ mod tests {
         // TabSeparated has no escaping, so a field containing a separator would silently
         // shift every column after it.
         let encoded = row(&trade());
-        assert_eq!(encoded.matches('\t').count(), 7);
+        assert_eq!(encoded.matches('\t').count(), 8);
         assert!(!encoded.contains('\n'));
     }
 

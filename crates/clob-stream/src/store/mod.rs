@@ -47,6 +47,13 @@ pub struct StoredTrade {
     pub quote_lots: u64,
     /// Seat that owned the resting order.
     pub maker_seat: u32,
+    /// Sequence number of the resting order that was hit.
+    ///
+    /// The only field that distinguishes two fills of the same size, at the same price,
+    /// against the same maker, in the same transaction — which is what a taker sweeping
+    /// a maker's refreshed quotes produces. Without it those two rows are identical and
+    /// deduplication drops one, under-reporting volume.
+    pub maker_order_sequence: u64,
     /// Side the taker was on. A taker on the bid consumed asks.
     pub taker_side_is_bid: bool,
 }
