@@ -17,6 +17,7 @@
 //! candles, historical queries, the flush path — is tested without infrastructure. The
 //! same split as [`Source`](crate::source::Source), for the same reason.
 
+pub mod clickhouse;
 pub mod memory;
 
 use anyhow::Result;
