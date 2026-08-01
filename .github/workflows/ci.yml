@@ -95,3 +95,31 @@ jobs:
       - name: Test
         run: cargo test
         working-directory: crates/${{ matrix.workspace }}
+
+  typescript:
+    name: ts/sdk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node runs the TypeScript directly, so there is nothing to build before testing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ts/sdk/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: ts/sdk
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: ts/sdk
+
+      # Includes the conformance suite against spec/wire-vectors.json. The Rust job
+      # asserts that file still describes the Rust builders; this asserts TypeScript
+      # reproduces it. A wire-format change that updates only one side fails here.
+      - name: Test
+        run: npm test
+        working-directory: ts/sdk
