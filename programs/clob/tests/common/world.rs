@@ -168,7 +168,46 @@ impl World {
     /// generated instructions are nonsense — and is not distinguished by kind, because
     /// the campaign's claim is about what survives, not about why anything failed.
     pub fn execute(&mut self, instruction: &Instruction) -> bool {
-        let keyed: Vec<(Pubkey, Account)> = instruction
+        let result = self
+            .mollusk
+            .process_instruction(instruction, &self.keyed_accounts(instruction));
+        if result.raw_result.is_err() {
+            return false;
+        }
+        for (key, account) in result.resulting_accounts {
+            self.accounts.insert(key, account);
+        }
+        true
+    }
+
+    /// Executes an instruction that must land, and reports the compute it consumed.
+    ///
+    /// Separate from [`execute`](Self::execute) because a benchmark and a fuzzer want
+    /// opposite things from a rejection. The fuzzer treats one as an ordinary outcome;
+    /// a benchmark that quoted it would be quoting the cheapest path the program has,
+    /// and quoting it as the cost of the instruction that did not run.
+    ///
+    /// # Panics
+    ///
+    /// If the instruction is rejected.
+    pub fn measure(&mut self, instruction: &Instruction) -> u64 {
+        let result = self
+            .mollusk
+            .process_instruction(instruction, &self.keyed_accounts(instruction));
+        assert!(
+            result.raw_result.is_ok(),
+            "a benchmarked instruction must land: {:?}",
+            result.raw_result
+        );
+        for (key, account) in result.resulting_accounts {
+            self.accounts.insert(key, account);
+        }
+        result.compute_units_consumed
+    }
+
+    /// The accounts an instruction names, as the world currently holds them.
+    fn keyed_accounts(&self, instruction: &Instruction) -> Vec<(Pubkey, Account)> {
+        instruction
             .accounts
             .iter()
             .map(|meta| {
@@ -182,16 +221,7 @@ impl World {
                     .unwrap_or_else(wallet);
                 (meta.pubkey, account)
             })
-            .collect();
-
-        let result = self.mollusk.process_instruction(instruction, &keyed);
-        if result.raw_result.is_err() {
-            return false;
-        }
-        for (key, account) in result.resulting_accounts {
-            self.accounts.insert(key, account);
-        }
-        true
+            .collect()
     }
 
     /// Every invariant that must hold after every instruction, landed or rejected.

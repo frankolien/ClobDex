@@ -10,10 +10,12 @@
 
 mod common;
 
-use clob_book::Side;
+use clob_book::{BaseLots, QuoteLots, Side, Ticks};
+use clob_client::instruction::{self as sdk, Receipt};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
+use common::world::World;
 use common::*;
 
 fn trader(id: u8) -> Pubkey {
@@ -114,7 +116,98 @@ fn report() {
         fixture.market,
     );
     println!("  cancel 8 orders                                 2   {cancel_eight:>6}");
+
+    settlement();
     println!();
+}
+
+/// The half of the table the fixture above cannot reach.
+///
+/// Everything so far writes balances straight into the market, which is right for
+/// measuring order entry and wrong for measuring anything that moves money: a deposit is
+/// a CPI to the SPL Token program, and that CPI is most of what it costs. These run in
+/// the same world the fuzzing campaign uses, with real vaults and real token accounts, so
+/// the numbers include the settlement they would include on a validator.
+fn settlement() {
+    let mut world = World::new(3, 2);
+    let addresses = world.addresses();
+    let (maker, maker_base, maker_quote) = trader_keys(&world, 0);
+    let (taker, taker_base, taker_quote) = trader_keys(&world, 1);
+    let stranger = world.traders()[2].wallet;
+
+    let claim = world.measure(&sdk::claim_seat(&addresses, &maker));
+    println!("  claim a seat                                    2   {claim:>6}");
+    world.execute(&sdk::claim_seat(&addresses, &taker));
+
+    let deposit = world.measure(&sdk::deposit(
+        &addresses,
+        &maker,
+        &maker_base,
+        &maker_quote,
+        BaseLots(5_000),
+        QuoteLots(5_000_000),
+    ));
+    println!("  deposit                                         7   {deposit:>6}");
+    world.execute(&sdk::deposit(
+        &addresses,
+        &taker,
+        &taker_base,
+        &taker_quote,
+        BaseLots(5_000),
+        QuoteLots(5_000_000),
+    ));
+
+    let withdraw = world.measure(&sdk::withdraw(
+        &addresses,
+        &maker,
+        &maker_base,
+        &maker_quote,
+        BaseLots(1),
+        QuoteLots(1),
+    ));
+    println!("  withdraw                                        8   {withdraw:>6}");
+
+    // A maker ladder for the taking instructions to cross.
+    let ladder: Vec<_> = (0..4)
+        .map(|level| post_only_packet(Side::Ask, 100 + level, 10))
+        .collect();
+    let batch_places = world.measure(&sdk::batch_update(&addresses, &maker, &[], &ladder));
+    println!("  batch: 0 cancels, 4 places                      2   {batch_places:>6}");
+
+    let resting: Vec<_> = world.all_resting(0);
+    let batch_both =
+        world.measure(&sdk::batch_update(&addresses, &maker, &resting[..4], &ladder));
+    println!("  batch: 4 cancels, 4 places                      2   {batch_both:>6}");
+
+    // Crossing with a seat, and crossing without one. The difference is the settlement:
+    // a seat already has funds in the market, so a swap pays for two token transfers a
+    // resting trader does not.
+    let crossing = sdk::limit(Side::Bid, Ticks(103), BaseLots(20));
+    let taken = world.measure(&sdk::place_order(&addresses, &taker, &crossing, Receipt::Off));
+    println!("  limit, crossing 2 levels (seated)               2   {taken:>6}");
+
+    let swap = world.measure(&sdk::swap(
+        &addresses,
+        &stranger,
+        &world.traders()[2].base,
+        &world.traders()[2].quote,
+        Side::Bid,
+        Ticks(103),
+        BaseLots(10),
+        BaseLots::ZERO,
+        64,
+        Receipt::Off,
+    ));
+    println!("  swap, crossing 1 level (no seat)                8   {swap:>6}");
+
+    let collect = world.measure(&sdk::collect_fees(&addresses, &world.fee_recipient()));
+    println!("  collect fees                                    5   {collect:>6}");
+}
+
+/// A trader's wallet and its two token accounts.
+fn trader_keys(world: &World, index: usize) -> (Pubkey, Pubkey, Pubkey) {
+    let trader = &world.traders()[index];
+    (trader.wallet, trader.base, trader.quote)
 }
 
 #[test]
@@ -245,4 +338,37 @@ fn a_full_sweep_fits_in_one_transaction() {
     );
     assert!(cu < 1_400_000, "64-level sweep cost {cu} CU");
     println!("64-level sweep: {cu} CU");
+}
+
+/// Finding a trader's seat must not get linearly more expensive as the market fills.
+///
+/// Every order-entry instruction begins by resolving a wallet to a seat, so if that
+/// lookup were a scan, the cost of trading would rise with the number of people who have
+/// ever traded — and a market would get more expensive precisely as it succeeded. It
+/// would also be a griefing vector: claiming seats is cheap and permissionless.
+///
+/// Measured across a fifteen-fold increase in occupancy, the ceiling here is a factor of
+/// two. A scan would blow through it long before the table was full.
+#[test]
+fn seat_lookup_does_not_scale_with_the_number_of_seats() {
+    let cost = |seats: u8| {
+        let fixture = Fixture::new();
+        let mut account = fixture.market_account(2);
+        for id in 0..seats {
+            fixture.seat(&mut account, trader(id), 1_000_000, 1_000_000_000);
+        }
+        seed_depth(&mut account, trader(0), Side::Ask, 100, 8, 10);
+        measure(
+            account,
+            trader(0),
+            &post_only_ix(fixture.market, trader(0), Side::Bid, 50, 10),
+            fixture.market,
+        )
+    };
+
+    let (few, many) = (cost(2), cost(30));
+    assert!(
+        many < few * 2,
+        "posting cost {few} CU with 2 seats and {many} with 30, which is not a lookup that scales"
+    );
 }
