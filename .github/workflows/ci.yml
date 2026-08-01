@@ -28,7 +28,7 @@ jobs:
     name: program and on-chain crates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -39,7 +39,7 @@ jobs:
       # The CLI, and the platform-tools it pulls down on first use — several hundred
       # megabytes that have no reason to be fetched twice a day.
       - name: Cache the Solana toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.local/share/solana
@@ -76,7 +76,7 @@ jobs:
       matrix:
         workspace: [clob-ops, clob-cli, clob-mm, clob-stream]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -100,10 +100,10 @@ jobs:
     name: ts/sdk
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Node runs the TypeScript directly, so there is nothing to build before testing.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm

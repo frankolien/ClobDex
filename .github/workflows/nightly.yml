@@ -31,12 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Cache the Solana toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.local/share/solana
@@ -68,7 +68,7 @@ jobs:
       # it a nightly failure is a log line saying something once went wrong.
       - name: Keep the failing seed
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: proptest-regressions
           path: programs/clob/tests/*.proptest-regressions
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history: the commit count is an input, and a shallow clone would fail on
           # a sweep longer than whatever depth was guessed here.
@@ -89,7 +89,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Cache the Solana toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.local/share/solana
