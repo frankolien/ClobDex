@@ -12,6 +12,20 @@ curl localhost:8080/v1/markets/<market>/traders/<wallet>        # balances, open
 websocat ws://localhost:8080/v1/markets/<market>/stream
 ```
 
+## Any origin may read it
+
+Everything here is public on-chain data served over `GET`, with no authentication, no
+cookie, no header carrying a secret, and nothing a request can change. An origin
+restriction would protect nothing and would only decide who gets to build a client, so the
+default is to allow any — the same reason every public market-data API does.
+
+It also has to be permissive to be usable: a browser refuses a cross-origin read without
+the header, and a UI on one port talking to an indexer on another is the normal arrangement.
+Set `ALLOWED_ORIGINS` to a comma-separated list to narrow it.
+
+**Narrow it the moment anything here needs credentials.** Any origin *plus* credentials is
+the combination that turns a read API into a way for any page to act as its visitor.
+
 ## Money is a string, coordinates are numbers
 
 Every price, size, value and order identity here is a `u64`. JSON has one numeric type —
