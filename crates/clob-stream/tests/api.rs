@@ -21,6 +21,8 @@ use solana_pubkey::Pubkey;
 type TestMarket = Market<128, 128, 32>;
 
 const MARKET: Pubkey = Pubkey::new_from_array([1u8; 32]);
+/// The program the fixture markets belong to. Only used to derive vault signers.
+const PROGRAM: Pubkey = Pubkey::new_from_array([7u8; 32]);
 const BASE_MINT: [u8; 32] = [9u8; 32];
 const QUOTE_MINT: [u8; 32] = [8u8; 32];
 
@@ -96,7 +98,8 @@ fn seeded(fixture: &Fixture, slot: u64) -> std::sync::Arc<Registry> {
 }
 
 fn summary(registry: &Registry) -> MarketSummary {
-    let mut summaries = registry.map_markets(MarketSummary::new);
+    let mut summaries =
+        registry.map_markets(|market, view| MarketSummary::new(&PROGRAM, market, view));
     assert_eq!(summaries.len(), 1, "the fixture seeds exactly one market");
     summaries.pop().unwrap()
 }
@@ -135,6 +138,33 @@ fn a_summary_carries_what_a_markets_table_renders() {
     assert_eq!(summary.lots.tick_size_in_quote_lots_per_base_unit, 1_000);
     assert_eq!(summary.lots.base_atoms_per_base_lot, 1_000_000);
     assert_eq!(summary.lots.quote_atoms_per_quote_lot, 1);
+}
+
+#[test]
+fn a_summary_carries_the_addresses_a_client_cannot_derive() {
+    // The TypeScript SDK ships no PDA derivation on purpose — that needs an ed25519
+    // on-curve check, which is a lot of arithmetic for one address — so the vault signer
+    // has to be given to it. Asserted against the same function the Rust client and the
+    // CLI use, because a summary that served a plausible-looking wrong PDA would send
+    // every deposit to an account nothing can spend from.
+    let fixture = Fixture::new();
+    let summary = summary(&seeded(&fixture, 1));
+
+    let (expected, _) = clob_client::address::vault_signer(&PROGRAM, &MARKET);
+    assert_eq!(summary.vault_signer, expected.to_string());
+
+    // And the vaults themselves, which are in the account and need no derivation at all.
+    assert_eq!(summary.base_vault, Pubkey::default().to_string());
+    assert_eq!(summary.quote_vault, Pubkey::default().to_string());
+}
+
+#[test]
+fn a_vault_signer_is_specific_to_its_market() {
+    // Derived from the market address, so two markets under one program must not share
+    // one. If they did, either market's authority could move the other's deposits.
+    let (one, _) = clob_client::address::vault_signer(&PROGRAM, &MARKET);
+    let (two, _) = clob_client::address::vault_signer(&PROGRAM, &Pubkey::new_from_array([2u8; 32]));
+    assert_ne!(one, two);
 }
 
 #[test]
@@ -523,5 +553,10 @@ fn summarising_every_market_copies_none_of_them() {
 
     let borrowed: Vec<usize> = registry.map_markets(|_, view| view.state.traders.len());
     assert_eq!(borrowed.len(), 2);
-    assert_eq!(registry.map_markets(MarketSummary::new).len(), 2);
+    assert_eq!(
+        registry
+            .map_markets(|market, view| MarketSummary::new(&PROGRAM, market, view))
+            .len(),
+        2
+    );
 }

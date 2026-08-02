@@ -50,8 +50,14 @@ pub struct LimitQuery {
 /// follow-up call per row. Everything comes from memory; rolling volume is on
 /// `/v1/markets/{market}/window`, which costs a query and so is not folded in here.
 #[get("/v1/markets")]
-pub async fn markets(registry: web::Data<Registry>) -> impl Responder {
-    HttpResponse::Ok().json(registry.map_markets(MarketSummary::new))
+pub async fn markets(
+    registry: web::Data<Registry>,
+    program_id: web::Data<Pubkey>,
+) -> impl Responder {
+    let program_id = program_id.into_inner();
+    HttpResponse::Ok().json(registry.map_markets(|market, view| {
+        MarketSummary::new(&program_id, market, view)
+    }))
 }
 
 /// One market's book.

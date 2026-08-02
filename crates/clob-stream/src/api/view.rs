@@ -206,6 +206,17 @@ pub struct MarketSummary {
     pub base_mint: String,
     /// Quote token mint.
     pub quote_mint: String,
+    /// Token account holding all base deposits.
+    pub base_vault: String,
+    /// Token account holding all quote deposits.
+    pub quote_vault: String,
+    /// The PDA that authorises movements out of both vaults.
+    ///
+    /// Derived here rather than left to the client. The TypeScript SDK deliberately ships
+    /// no PDA derivation — that needs an ed25519 on-curve check, which is a lot of
+    /// arithmetic for one address — so an address it cannot compute has to be given to it,
+    /// and a market's own record is the natural place for it to come from.
+    pub vault_signer: String,
     /// Taker fee, in basis points.
     pub taker_fee_bps: u64,
     /// Tick and lot geometry.
@@ -247,14 +258,23 @@ pub struct MarketSummary {
 
 impl MarketSummary {
     /// Summarises one tracked market.
-    pub fn new(market: &solana_pubkey::Pubkey, view: &crate::registry::MarketView) -> Self {
+    pub fn new(
+        program_id: &solana_pubkey::Pubkey,
+        market: &solana_pubkey::Pubkey,
+        view: &crate::registry::MarketView,
+    ) -> Self {
         let state = &view.state;
+        let (vault_signer, _) = clob_client::address::vault_signer(program_id, market);
         Self {
             market: market.to_string(),
             slot: view.slot,
             finalized_through: view.finalized_through,
             base_mint: solana_pubkey::Pubkey::new_from_array(state.account.base_mint).to_string(),
             quote_mint: solana_pubkey::Pubkey::new_from_array(state.account.quote_mint).to_string(),
+            base_vault: solana_pubkey::Pubkey::new_from_array(state.account.base_vault).to_string(),
+            quote_vault: solana_pubkey::Pubkey::new_from_array(state.account.quote_vault)
+                .to_string(),
+            vault_signer: vault_signer.to_string(),
             taker_fee_bps: state.fees().taker_fee_bps,
             lots: Lots::from(state.lot_config()),
             best_bid_in_ticks: state.best_bid().map(|o| o.price_in_ticks().as_u64()),

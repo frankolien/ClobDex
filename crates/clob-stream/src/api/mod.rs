@@ -17,15 +17,20 @@ use crate::registry::Registry;
 pub async fn serve(
     registry: Arc<Registry>,
     store: Arc<dyn crate::store::Store>,
+    program_id: solana_pubkey::Pubkey,
     bind: &str,
 ) -> std::io::Result<()> {
     let state = web::Data::from(registry);
     let store = web::Data::new(store);
+    // Needed to derive each market's vault signer, which is a PDA the TypeScript SDK
+    // cannot compute for itself.
+    let program_id = web::Data::new(program_id);
 
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
             .app_data(store.clone())
+            .app_data(program_id.clone())
             .service(http::markets)
             .service(http::book)
             .service(http::trades)

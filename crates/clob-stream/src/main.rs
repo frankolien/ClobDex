@@ -58,7 +58,7 @@ fn main() -> Result<()> {
         .context("spawning the ingest thread")?;
 
     println!("serving on http://{bind}");
-    actix_web::rt::System::new().block_on(api::serve(registry, store, &bind))?;
+    actix_web::rt::System::new().block_on(api::serve(registry, store, program_id, &bind))?;
 
     // Only reached when the API stops; the ingest thread ends with the process.
     match ingest.join() {
