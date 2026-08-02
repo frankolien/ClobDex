@@ -9,7 +9,10 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// `Astro.site` is undefined when the config does not set one, and `new URL` then throws
+// "Invalid URL" — which names neither the setting nor the file. Omitting the canonical tag
+// is the correct behaviour for a build that does not know its own origin.
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : null;
 ---
 
 <!doctype html>
@@ -19,12 +22,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {canonical && <link rel="canonical" href={canonical} />}
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {canonical && <meta property="og:url" content={canonical} />}
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- The page is dark by design rather than by preference, so the browser is told

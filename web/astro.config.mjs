@@ -13,9 +13,14 @@ import { defineConfig } from "astro/config";
  * The alternative is a framework whose job would be rendering text that never changes.
  */
 export default defineConfig({
-  // Canonical URLs and Open Graph tags are built from this, so it has to be the real
-  // origin before launch. `example.com` is reserved by RFC 2606 and can never belong to
-  // anyone, which is the point: a placeholder that resolves is a placeholder that ships.
+  // Canonical URLs and Open Graph tags are built from this, so it has to be the real origin
+  // before launch. Unlike Vite's, Astro's `defineConfig` takes an object rather than a
+  // function of the command, so this cannot vary between dev and build — which is fine,
+  // because a canonical URL is metadata nobody reads while developing.
+  //
+  // `example.com` is reserved by RFC 2606 so that documentation cannot accidentally address
+  // a real host. That is the point: a placeholder which resolves is a placeholder that
+  // ships.
   site: process.env.PUBLIC_SITE_URL ?? "https://example.com",
   output: "static",
   build: {

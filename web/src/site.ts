@@ -7,17 +7,26 @@
  * that needed one would be doing something wrong.
  */
 
+/** Where `npm run dev` serves the trading app from. */
+const LOCAL_APP = "http://localhost:5173";
+
 /**
  * Where the trading app is deployed, or `null` if this build was not told.
  *
- * Deliberately not defaulted. The first version of this file guessed a plausible domain,
- * and that domain turned out to be registered by a squatter and parked for sale — so every
- * "Launch app" button on the site pointed at somebody's listing page, and the only symptom
- * was a TLS error nobody would connect to a missing environment variable.
+ * In development it falls back to the sibling dev server, which is a fact about this
+ * repository's own tooling rather than a guess. In a production build there is no fallback
+ * at all.
  *
- * A build that does not know where its app lives should say so, not invent an address.
+ * That distinction is here because the alternative was tried. An earlier version defaulted
+ * to a plausible-looking domain, which turned out to be registered and parked for sale — so
+ * every "Launch app" button pointed at somebody's listing page, and the only symptom was a
+ * TLS error that says nothing about a missing environment variable.
+ *
+ * A shipped build that does not know where its app lives should say so, not invent an
+ * address.
  */
-export const appUrl: string | null = import.meta.env.PUBLIC_APP_URL ?? null;
+export const appUrl: string | null =
+  import.meta.env.PUBLIC_APP_URL ?? (import.meta.env.DEV ? LOCAL_APP : null);
 
 export const links = {
   app: appUrl,
