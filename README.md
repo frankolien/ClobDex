@@ -11,7 +11,7 @@ ladder for **4,639 compute units**.
 ```
 cargo build-sbf --manifest-path programs/clob/Cargo.toml   # the program
 cargo test --workspace                                     # 285 tests, incl. fuzzing
-cargo run -p clob-stream                                   # the indexer
+cd crates/clob-stream && cargo run                         # the indexer
 cd app && npm run dev                                      # the trading app
 cd web && npm run dev                                      # the marketing site
 ```
@@ -35,7 +35,11 @@ cd web && npm run dev                                      # the marketing site
 Five Cargo workspaces, not one. Cargo resolves a single dependency graph per workspace
 *including dev-dependencies*, and litesvm and solana-client want incompatible versions of
 the same crate — so the on-chain crates and each off-chain tool are resolved separately.
-That is why `cargo test --workspace` covers a fifth of the repository and CI runs five.
+
+The practical consequence is worth knowing before it confuses you: the four excluded
+crates are invisible from the root, so `cargo run -p clob-stream` fails with "not found in
+workspace". Each is entered and run from its own directory, and `cargo test --workspace`
+covers only the on-chain fifth — which is why CI runs five separate jobs.
 
 ## Why crankless matters
 

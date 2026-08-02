@@ -3,7 +3,7 @@
 Streams ClobDex markets from a Yellowstone endpoint and serves the derived tape.
 
 ```
-cargo run -p clob-stream          # reads .env
+cargo run                         # from this directory: its own workspace, reads .env
 curl localhost:8080/v1/markets                                  # every market, summarised
 curl localhost:8080/v1/markets/<market>/book?depth=10
 curl localhost:8080/v1/markets/<market>/trades
