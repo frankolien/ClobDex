@@ -12,6 +12,7 @@ ladder for **4,639 compute units**.
 cargo build-sbf --manifest-path programs/clob/Cargo.toml   # the program
 cargo test --workspace                                     # 285 tests, incl. fuzzing
 cd crates/clob-stream && cargo run                         # the indexer
+cd crates/clob-tui && cargo run -- --market <address>      # watch it from a terminal
 cd app && npm run dev                                      # the trading app
 cd web && npm run dev                                      # the marketing site
 ```
@@ -28,18 +29,19 @@ cd web && npm run dev                                      # the marketing site
 | [`crates/clob-stream`](crates/clob-stream) | The indexer | Yellowstone → REST + WebSocket, with rollback handling |
 | [`crates/clob-mm`](crates/clob-mm) | Market maker | Inventory skew, ladders proven not to cross |
 | [`crates/clob-cli`](crates/clob-cli) | Operations | Create markets, trade, benchmark |
+| [`crates/clob-tui`](crates/clob-tui) | Terminal view | Live book, tape and position — read-only |
 | [`ts/sdk`](ts/sdk) | TypeScript SDK | Zero runtime dependencies, held to the Rust bytes |
 | [`app`](app) | Trading app | Vite + React, its own deploy |
 | [`web`](web) | Marketing site | Astro, its own deploy |
 
-Five Cargo workspaces, not one. Cargo resolves a single dependency graph per workspace
+Six Cargo workspaces, not one. Cargo resolves a single dependency graph per workspace
 *including dev-dependencies*, and litesvm and solana-client want incompatible versions of
 the same crate — so the on-chain crates and each off-chain tool are resolved separately.
 
 The practical consequence is worth knowing before it confuses you: the four excluded
 crates are invisible from the root, so `cargo run -p clob-stream` fails with "not found in
 workspace". Each is entered and run from its own directory, and `cargo test --workspace`
-covers only the on-chain fifth — which is why CI runs five separate jobs.
+covers only the on-chain crates — which is why CI runs a job per workspace.
 
 ## Why crankless matters
 

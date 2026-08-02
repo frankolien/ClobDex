@@ -7,7 +7,11 @@ members = ["crates/clob-book", "crates/clob-client", "crates/clob-engine", "crat
 # needing wincode 0.5) and solana-client (needing wincode 0.6) would have to agree, and
 # they cannot. An on-chain program and an RPC client tool have no reason to share a
 # lockfile; keeping them apart is what lets each pick the versions it actually needs.
-exclude = ["crates/clob-cli", "crates/clob-mm", "crates/clob-ops", "crates/clob-stream"]
+#
+# `exclude` does not override an explicit `members` entry, and `cargo init` writes one. A
+# crate listed in both is a member — which is how `clob-tui` briefly pulled a terminal
+# library into the on-chain build while this comment said it did not.
+exclude = ["crates/clob-cli", "crates/clob-mm", "crates/clob-ops", "crates/clob-stream", "crates/clob-tui"]
 
 [workspace.package]
 edition = "2024"

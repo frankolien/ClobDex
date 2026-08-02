@@ -124,7 +124,7 @@ jobs:
             cargo build-sbf --manifest-path programs/clob/Cargo.toml || ok=0
             [ "$ok" = 1 ] && { cargo test --workspace || ok=0; }
             if [ "$ok" = 1 ]; then
-              for workspace in clob-ops clob-cli clob-mm clob-stream; do
+              for workspace in clob-ops clob-cli clob-mm clob-stream clob-tui; do
                 # A workspace that did not exist yet is not a failure. Walking back far
                 # enough reaches commits from before it was written, and treating a
                 # missing directory as broken would condemn every one of them.
