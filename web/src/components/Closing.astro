@@ -1,5 +1,7 @@
 ---
-import { links } from "../site.ts";
+import { launch, links } from "../site.ts";
+
+const app = launch();
 
 /**
  * The reference's closing band: full-bleed green, a serif headline in two tones, one
@@ -18,8 +20,8 @@ import { links } from "../site.ts";
       benchmarks, and check the numbers against your own machine.
     </p>
     <div class="actions">
-      <a class="btn btn-dark" href={links.app}>Launch app</a>
-      <a class="btn btn-clear" href={links.github} rel="noopener">Read the source</a>
+      <a class="btn btn-dark" href={app.href}>{app.label}</a>
+      {app.live && <a class="btn btn-clear" href={links.github} rel="noopener">Read the source</a>}
     </div>
   </div>
 </section>

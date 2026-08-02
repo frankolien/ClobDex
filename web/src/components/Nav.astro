@@ -1,5 +1,7 @@
 ---
-import { links } from "../site.ts";
+import { launch, links } from "../site.ts";
+
+const app = launch();
 
 /**
  * Left mark, centre navigation, right actions — the enterprise arrangement the reference
@@ -59,7 +61,9 @@ const groups = [
 
     <div class="actions">
       <a class="plain" href={links.github} rel="noopener">GitHub</a>
-      <a class="btn btn-solid" href={links.app}>Launch app</a>
+      <!-- A different origin, not a route: the app is its own deploy. When there is no
+           deployment to cross to, this goes to the source rather than nowhere. -->
+      <a class="btn btn-solid" href={app.href}>{app.label}</a>
     </div>
   </div>
 </header>

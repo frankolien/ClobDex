@@ -69,9 +69,13 @@ export function Header() {
           {trader ? shortAddress(trader) : "Watch"}
         </button>
         <ConnectButton />
-        <a className="btn" href={config.siteUrl}>
-          About
-        </a>
+        {/* Only when this build was told where the site is. An anchor with no href is a
+            button that looks clickable and does nothing, which is worse than no button. */}
+        {config.siteUrl && (
+          <a className="btn" href={config.siteUrl}>
+            About
+          </a>
+        )}
       </div>
     </header>
   );

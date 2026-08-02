@@ -7,9 +7,20 @@
  * that needed one would be doing something wrong.
  */
 
+/**
+ * Where the trading app is deployed, or `null` if this build was not told.
+ *
+ * Deliberately not defaulted. The first version of this file guessed a plausible domain,
+ * and that domain turned out to be registered by a squatter and parked for sale — so every
+ * "Launch app" button on the site pointed at somebody's listing page, and the only symptom
+ * was a TLS error nobody would connect to a missing environment variable.
+ *
+ * A build that does not know where its app lives should say so, not invent an address.
+ */
+export const appUrl: string | null = import.meta.env.PUBLIC_APP_URL ?? null;
+
 export const links = {
-  /** The trading app. A separate deploy — see `app/`. */
-  app: import.meta.env.PUBLIC_APP_URL ?? "https://app.clobdex.xyz",
+  app: appUrl,
   github: "https://github.com/frankolien/ClobDex",
   benchmarks: "https://github.com/frankolien/ClobDex/blob/main/BENCHMARKS.md",
   sdk: "https://github.com/frankolien/ClobDex/tree/main/ts/sdk",
@@ -28,3 +39,16 @@ export const status = {
   audited: false,
   programAddress: "DaNh1Gk3xCLwzHhFQZTgLZuvUMS8YyfPqzs9ZgqFqhTe",
 } as const;
+
+/**
+ * Where a "Launch app" control should point, and what it should say.
+ *
+ * When the app has no deployment, the honest control is one that goes to the source rather
+ * than one that goes nowhere. A disabled button invites a click and answers nothing; a
+ * button that navigates to a stranger's parking page is worse than either.
+ */
+export function launch(): { href: string; label: string; live: boolean } {
+  return appUrl === null
+    ? { href: links.github, label: "View the source", live: false }
+    : { href: appUrl, label: "Launch app", live: true };
+}

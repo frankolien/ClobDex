@@ -1,6 +1,6 @@
 ---
 import Sky from "./Sky.astro";
-import { links, status } from "../site.ts";
+import { launch, status } from "../site.ts";
 
 /**
  * The reference puts a "Built on" logo row under its calls to action and a four-figure
@@ -11,6 +11,8 @@ import { links, status } from "../site.ts";
  * from the repository, unlike a number of users, and are the numbers this audience would
  * actually ask for.
  */
+const app = launch();
+
 const built = ["Solana", "SPL Token", "Yellowstone gRPC", "ClickHouse"];
 
 const figures = [
@@ -36,7 +38,7 @@ const figures = [
     </p>
 
     <div class="actions">
-      <a class="btn btn-solid" href={links.app}>Launch app</a>
+      <a class="btn btn-solid" href={app.href}>{app.label}</a>
       <a class="btn btn-line" href="#compute">View compute</a>
     </div>
 

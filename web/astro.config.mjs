@@ -13,7 +13,10 @@ import { defineConfig } from "astro/config";
  * The alternative is a framework whose job would be rendering text that never changes.
  */
 export default defineConfig({
-  site: "https://clobdex.xyz",
+  // Canonical URLs and Open Graph tags are built from this, so it has to be the real
+  // origin before launch. `example.com` is reserved by RFC 2606 and can never belong to
+  // anyone, which is the point: a placeholder that resolves is a placeholder that ships.
+  site: process.env.PUBLIC_SITE_URL ?? "https://example.com",
   output: "static",
   build: {
     // One stylesheet rather than a <link> per component. The whole thing is smaller than a

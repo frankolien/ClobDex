@@ -20,8 +20,13 @@ export interface Config {
   readonly rpcUrl: string;
   /** Which cluster this points at, for the badge that stops mainnet mistakes. */
   readonly cluster: "devnet" | "mainnet" | "localnet";
-  /** The marketing site. This app is a separate deploy, so it is a URL and not a route. */
-  readonly siteUrl: string;
+  /**
+   * The marketing site, if this build was told where it is.
+   *
+   * Not defaulted to a guess. A plausible-looking domain that nobody owns is worse than
+   * no link: the button works, goes somewhere, and that somewhere belongs to a stranger.
+   */
+  readonly siteUrl: string | null;
 }
 
 function required(name: string, value: string | undefined): string {
@@ -61,5 +66,5 @@ export const config: Config = {
   programAddress: required("VITE_PROGRAM_ADDRESS", import.meta.env.VITE_PROGRAM_ADDRESS),
   rpcUrl: required("VITE_RPC_URL", import.meta.env.VITE_RPC_URL),
   cluster: clusterOf(import.meta.env.VITE_CLUSTER),
-  siteUrl: import.meta.env.VITE_SITE_URL ?? "https://clobdex.xyz",
+  siteUrl: import.meta.env.VITE_SITE_URL ?? null,
 };

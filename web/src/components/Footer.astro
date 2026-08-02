@@ -1,11 +1,13 @@
 ---
-import { links, status } from "../site.ts";
+import { launch, links, status } from "../site.ts";
 
 /**
  * The reference closes with a block of disclosures. Kept, and the text is real rather than
  * boilerplate: this is unaudited software on a test network, and the page above is
  * persuasive enough that the last thing on it should say so plainly.
  */
+const app = launch();
+
 const columns = [
   {
     title: "Protocol",
@@ -50,8 +52,8 @@ const columns = [
     }
 
     <div class="cta">
-      <p class="ct">Trading app</p>
-      <a class="btn btn-line" href={links.app}>Launch app</a>
+      <p class="ct">{app.live ? "Trading app" : "Source"}</p>
+      <a class="btn btn-line" href={app.href}>{app.label}</a>
     </div>
   </div>
 
