@@ -4,7 +4,7 @@ import type { LotConfig } from "@clobdex/sdk";
 
 import { type FeedState, isFinal } from "../lib/feed.ts";
 import { anchorAt, ago } from "../lib/time.ts";
-import { price, size } from "../lib/format.ts";
+import { type Decimals, price, size } from "../lib/format.ts";
 
 /**
  * The trade tape.
@@ -19,7 +19,15 @@ import { price, size } from "../lib/format.ts";
  * server stamps it when it sends, so a fill that has since rooted still says otherwise on
  * the object it arrived in.
  */
-export function Tape({ feed, lots }: { feed: FeedState; lots: LotConfig }) {
+export function Tape({
+  feed,
+  lots,
+  decimals,
+}: {
+  feed: FeedState;
+  lots: LotConfig;
+  decimals: Decimals;
+}) {
   // The clock is pinned once per slot advance rather than per render, so rows do not
   // recompute their age sixty times a second for no visible change.
   const anchor = useMemo(() => anchorAt(feed.slot, Date.now()), [feed.slot]);
@@ -48,9 +56,9 @@ export function Tape({ feed, lots }: { feed: FeedState; lots: LotConfig }) {
           return (
             <li key={`${fill.slot}-${index}`} className={rooted ? "" : "pending"}>
               <span className={`num ${fill.takerSide === "bid" ? "bid" : "ask"}`}>
-                {price(lots, fill.priceInTicks)}
+                {price(lots, fill.priceInTicks, decimals)}
               </span>
-              <span className="num r">{size(lots, fill.baseLots)}</span>
+              <span className="num r">{size(lots, fill.baseLots, decimals)}</span>
               <span className="num r muted" title={`slot ${fill.slot}`}>
                 {rooted ? ago(anchor, fill.slot, now) : "pending"}
               </span>

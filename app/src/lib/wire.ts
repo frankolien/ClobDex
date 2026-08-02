@@ -33,6 +33,9 @@ export interface WireMarketSummary {
   finalized_through: number;
   base_mint: string;
   quote_mint: string;
+  base_vault: string;
+  quote_vault: string;
+  vault_signer: string;
   taker_fee_bps: number;
   lots: WireLots;
   best_bid_in_ticks: string | null;

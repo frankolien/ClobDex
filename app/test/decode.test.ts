@@ -31,6 +31,9 @@ function summary(overrides: Partial<WireMarketSummary> = {}): WireMarketSummary 
     finalized_through: 498,
     base_mint: "BASE",
     quote_mint: "QUOTE",
+    base_vault: "BASEVAULT",
+    quote_vault: "QUOTEVAULT",
+    vault_signer: "VAULTSIGNER",
     taker_fee_bps: 7,
     lots: {
       base_lots_per_base_unit: "1000",
@@ -62,6 +65,10 @@ test("a market summary decodes every field the table renders", () => {
   assert.equal(decoded.takerFeeBps, 7, "bps stays a number");
   assert.equal(decoded.slot, 500, "a slot stays a number");
   assert.equal(decoded.lots.baseAtomsPerBaseLot, 1_000_000n);
+
+  // The addresses a client cannot derive for itself, carried so it never has to.
+  assert.equal(decoded.vaultSigner, "VAULTSIGNER");
+  assert.equal(decoded.baseVault, "BASEVAULT");
 });
 
 test("an absent price decodes to null, never to zero", () => {

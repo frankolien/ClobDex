@@ -11,7 +11,7 @@ import {
 import type { LotConfig } from "@clobdex/sdk";
 
 import { indexer } from "../lib/store.ts";
-import { ASSUMED_QUOTE_DECIMALS } from "../lib/format.ts";
+import { type Decimals, ASSUMED } from "../lib/format.ts";
 import { SLOTS_PER_HOUR, anchorAt, secondsOf } from "../lib/time.ts";
 
 /**
@@ -30,14 +30,21 @@ export function Chart({
   market,
   lots,
   slot,
+  decimals = ASSUMED,
   interval = 150,
 }: {
   market: string;
   lots: LotConfig;
   slot: number;
+  decimals?: Decimals;
   interval?: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  // Read through a ref so the chart is created once: lightweight-charts takes the price
+  // format at series creation, and re-creating the chart when a mint resolves would throw
+  // away the zoom and pan someone had set.
+  const quoteDecimals = useRef(decimals.quote);
+  quoteDecimals.current = decimals.quote;
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
@@ -67,7 +74,7 @@ export function Chart({
       borderVisible: false,
       wickUpColor: "#4ade9b",
       wickDownColor: "#ef7d63",
-      priceFormat: { type: "price", precision: ASSUMED_QUOTE_DECIMALS, minMove: 1e-6 },
+      priceFormat: { type: "price", precision: quoteDecimals.current, minMove: 1e-6 },
     });
 
     chart.current = instance;

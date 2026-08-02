@@ -13,6 +13,9 @@
     "test": "node --test 'test/*.test.ts'"
   },
   "dependencies": {
+    "@clobdex/sdk": "file:../ts/sdk",
+    "@solana/kit": "^7.0.0",
+    "@wallet-ui/react": "^4.2.1",
     "lightweight-charts": "^5.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

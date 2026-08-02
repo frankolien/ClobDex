@@ -66,17 +66,39 @@ Callers wanting minutes convert at the edge. [`src/lib/time.ts`](src/lib/time.ts
 edge and its header says so — fine for axis labels and "3 minutes ago", not fine for
 anything anyone would reconcile. Nothing sent to the chain passes through it.
 
+## Signing
+
+A wallet connects over the Wallet Standard, and the SDK's plain-data instructions pass
+almost unchanged into `@solana/kit`. The "almost" is [`src/lib/tx.ts`](src/lib/tx.ts): the
+SDK describes an account with two booleans and kit describes the same four combinations
+with one enum, so that mapping is separated out and tested. Getting it backwards produces a
+transaction rejected for the wrong signers, or — worse — one accepted having asked for
+write access it did not need.
+
+Order entry validates on the client before prompting, in
+[`src/lib/order.ts`](src/lib/order.ts). Every check is one the program makes anyway; making
+it again here is refusing to spend a signing prompt and a fee to learn something already on
+screen. That module is a `.ts` rather than living beside the form, because Node runs
+TypeScript by stripping types and JSX is not a type — logic worth testing cannot sit in a
+`.tsx` file without a build step.
+
+Exactly one cluster is offered: the one this deploy was built against, using this deploy's
+own RPC. A picker would let someone connect to mainnet on a page whose indexer and program
+address point at devnet, and every number on screen would then belong to a different chain
+than the wallet does.
+
 ## What it cannot do yet
 
-**Sign anything.** There is no wallet connection, so this is read-only: markets, book,
-tape, candles, and any wallet's balances and resting orders by address. Order entry needs
-`@solana/kit` and a wallet adapter, and the SDK's instruction builders already return the
-shape they take.
+**Deposit and withdraw.** The instructions exist in the SDK and the indexer now serves the
+vault addresses they need, but there is no form for them. Until then a seat is funded with
+`clob-cli`.
 
-**Read mint decimals.** The indexer serves mint addresses, not metadata, so
-`ASSUMED_BASE_DECIMALS` and `ASSUMED_QUOTE_DECIMALS` stand in. They match the SOL/USDC
-shape the CLI creates; a market with a different one will display shifted. A placeholder,
-not a default to rely on.
+**Sweep a market by size rather than price.** The program takes an IOC order with a match
+limit; the ticket only offers limit, post-only and fill-or-kill.
+
+**Verify what it renders.** Nothing here has been exercised against a live wallet on a live
+market. The transaction assembly and the order validation are tested; the signing path is
+not, because testing it needs a browser and a wallet.
 
 **Show a portfolio efficiently.** The indexer answers per market, so the portfolio view
 asks each one. Fine at devnet scale, wrong at a hundred markets — the fix then is an

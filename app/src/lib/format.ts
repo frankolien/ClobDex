@@ -14,24 +14,33 @@
 import { type LotConfig, formatPrice, formatSize } from "@clobdex/sdk";
 
 /**
- * Decimals to assume for a mint the app has not looked up.
+ * Decimals used until a mint has been read.
  *
- * The indexer serves mint addresses, not metadata, so decimals are unknown until something
- * fetches them. Nine and six are the SOL/USDC shape the CLI creates, which is what devnet
- * is running. Guessing wrong shifts a displayed number by orders of magnitude, so this is
- * a placeholder to be replaced by a real mint lookup, not a default to rely on.
+ * Nine and six are the SOL/USDC shape the CLI creates. They are a starting point for the
+ * first paint only — `useDecimals` replaces them as soon as the mints resolve — and being
+ * wrong about them shifts a displayed number by orders of magnitude, so nothing should
+ * rely on them past that first frame.
  */
 export const ASSUMED_BASE_DECIMALS = 9;
 export const ASSUMED_QUOTE_DECIMALS = 6;
 
+/** How many atoms make one whole token, for each side of a market. */
+export interface Decimals {
+  readonly base: number;
+  readonly quote: number;
+}
+
+/** What to use before the chain has answered. */
+export const ASSUMED: Decimals = { base: ASSUMED_BASE_DECIMALS, quote: ASSUMED_QUOTE_DECIMALS };
+
 /** A price in ticks, as a human price. */
-export function price(lots: LotConfig, ticks: bigint | null): string {
-  return ticks === null ? "—" : formatPrice(lots, ticks, ASSUMED_QUOTE_DECIMALS);
+export function price(lots: LotConfig, ticks: bigint | null, decimals: Decimals = ASSUMED): string {
+  return ticks === null ? "—" : formatPrice(lots, ticks, decimals.quote);
 }
 
 /** A size in base lots, as a human size. */
-export function size(lots: LotConfig, baseLots: bigint): string {
-  return formatSize(lots, baseLots, ASSUMED_BASE_DECIMALS);
+export function size(lots: LotConfig, baseLots: bigint, decimals: Decimals = ASSUMED): string {
+  return formatSize(lots, baseLots, decimals.base);
 }
 
 /**
@@ -72,8 +81,12 @@ export function shortAddress(address: string): string {
  * A gain rendered without a `+` reads as a number rather than as a direction, and the two
  * are easy to confuse at a glance in a column of them.
  */
-export function signed(lots: LotConfig, ticks: bigint | null): string {
+export function signed(
+  lots: LotConfig,
+  ticks: bigint | null,
+  decimals: Decimals = ASSUMED,
+): string {
   if (ticks === null) return "—";
-  const magnitude = formatPrice(lots, ticks < 0n ? -ticks : ticks, ASSUMED_QUOTE_DECIMALS);
+  const magnitude = formatPrice(lots, ticks < 0n ? -ticks : ticks, decimals.quote);
   return `${ticks < 0n ? "−" : "+"}${magnitude}`;
 }

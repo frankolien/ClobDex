@@ -1,7 +1,7 @@
 import type { LotConfig } from "@clobdex/sdk";
 
 import type { Level } from "../lib/decode.ts";
-import { price, size } from "../lib/format.ts";
+import { type Decimals, price, size } from "../lib/format.ts";
 import { type FeedState, bestAsk, bestBid, mid, spread } from "../lib/feed.ts";
 
 /**
@@ -14,7 +14,17 @@ import { type FeedState, bestAsk, bestBid, mid, spread } from "../lib/feed.ts";
  * Depth bars are scaled to the largest level *shown*, not to the largest in the book. A
  * bar scaled to something off-screen is a bar that conveys nothing.
  */
-export function Ladder({ feed, lots, rows = 12 }: { feed: FeedState; lots: LotConfig; rows?: number }) {
+export function Ladder({
+  feed,
+  lots,
+  decimals,
+  rows = 12,
+}: {
+  feed: FeedState;
+  lots: LotConfig;
+  decimals: Decimals;
+  rows?: number;
+}) {
   const asks = feed.asks.slice(0, rows);
   const bids = feed.bids.slice(0, rows);
 
@@ -39,20 +49,36 @@ export function Ladder({ feed, lots, rows = 12 }: { feed: FeedState; lots: LotCo
           first; only the display order differs. */}
       <ol className="side">
         {[...asks].reverse().map((level, index) => (
-          <Row key={`a${index}`} level={level} lots={lots} widest={widest} side="ask" rest={asks.slice(0, asks.length - index)} />
+          <Row
+            key={`a${index}`}
+            level={level}
+            lots={lots}
+            decimals={decimals}
+            widest={widest}
+            side="ask"
+            rest={asks.slice(0, asks.length - index)}
+          />
         ))}
       </ol>
 
       <div className="spread">
-        <span className="mark num">{price(lots, midpoint)}</span>
+        <span className="mark num">{price(lots, midpoint, decimals)}</span>
         <span className="gap num muted">
-          {gap === null ? "no spread" : `${price(lots, gap)} spread`}
+          {gap === null ? "no spread" : `${price(lots, gap, decimals)} spread`}
         </span>
       </div>
 
       <ol className="side">
         {bids.map((level, index) => (
-          <Row key={`b${index}`} level={level} lots={lots} widest={widest} side="bid" rest={bids.slice(0, index + 1)} />
+          <Row
+            key={`b${index}`}
+            level={level}
+            lots={lots}
+            decimals={decimals}
+            widest={widest}
+            side="bid"
+            rest={bids.slice(0, index + 1)}
+          />
         ))}
       </ol>
 
@@ -66,10 +92,10 @@ export function Ladder({ feed, lots, rows = 12 }: { feed: FeedState; lots: LotCo
 
       <footer className="touch">
         <span>
-          Bid <b className="num bid">{price(lots, bestBid(feed))}</b>
+          Bid <b className="num bid">{price(lots, bestBid(feed), decimals)}</b>
         </span>
         <span>
-          Ask <b className="num ask">{price(lots, bestAsk(feed))}</b>
+          Ask <b className="num ask">{price(lots, bestAsk(feed), decimals)}</b>
         </span>
       </footer>
     </section>
@@ -79,12 +105,14 @@ export function Ladder({ feed, lots, rows = 12 }: { feed: FeedState; lots: LotCo
 function Row({
   level,
   lots,
+  decimals,
   widest,
   side,
   rest,
 }: {
   level: Level;
   lots: LotConfig;
+  decimals: Decimals;
   widest: bigint;
   side: "bid" | "ask";
   rest: Level[];
@@ -98,9 +126,9 @@ function Row({
   return (
     <li className={side}>
       <span className="bar" style={{ width: `${fill}%` }} />
-      <span className={`p num ${side}`}>{price(lots, level.priceInTicks)}</span>
-      <span className="s num r">{size(lots, level.baseLots)}</span>
-      <span className="t num r muted">{size(lots, total)}</span>
+      <span className={`p num ${side}`}>{price(lots, level.priceInTicks, decimals)}</span>
+      <span className="s num r">{size(lots, level.baseLots, decimals)}</span>
+      <span className="t num r muted">{size(lots, total, decimals)}</span>
     </li>
   );
 }

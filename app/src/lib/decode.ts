@@ -79,6 +79,10 @@ export interface MarketSummary {
   readonly finalizedThrough: number;
   readonly baseMint: string;
   readonly quoteMint: string;
+  readonly baseVault: string;
+  readonly quoteVault: string;
+  /** The PDA authorising both vaults. Given rather than derived — see the SDK's README. */
+  readonly vaultSigner: string;
   readonly takerFeeBps: number;
   readonly lots: LotConfig;
   readonly bestBidInTicks: bigint | null;
@@ -101,6 +105,9 @@ export function marketSummary(wire: WireMarketSummary): MarketSummary {
     finalizedThrough: wire.finalized_through,
     baseMint: wire.base_mint,
     quoteMint: wire.quote_mint,
+    baseVault: wire.base_vault,
+    quoteVault: wire.quote_vault,
+    vaultSigner: wire.vault_signer,
     takerFeeBps: wire.taker_fee_bps,
     lots: lots(wire.lots),
     bestBidInTicks: maybeQuantity(wire.best_bid_in_ticks, "best_bid_in_ticks"),

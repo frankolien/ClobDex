@@ -2,6 +2,7 @@ import { config } from "../lib/config.ts";
 import { go, tradeHref, useRoute } from "../lib/router.ts";
 import { shortAddress } from "../lib/format.ts";
 import { useApp } from "../lib/store.ts";
+import { ConnectButton } from "./Wallet.tsx";
 
 /**
  * The one persistent chrome.
@@ -27,14 +28,13 @@ export function Header() {
   ];
 
   /**
-   * Stands in for a wallet connection.
+   * Watching an address without connecting one.
    *
-   * Everything read-only keys off an address, so pasting one shows a real position
-   * immediately — and it keeps the wallet adapter out of the critical path while the rest
-   * of the app is built. Signing needs a wallet and this cannot do it, which is why the
-   * button says what it does rather than "Connect".
+   * Kept alongside the wallet button because they answer different needs: connecting is
+   * for trading, and this is for looking at somebody else's position — which is how you
+   * check a market maker is quoting what you think it is.
    */
-  const chooseTrader = () => {
+  const watchAddress = () => {
     const entered = window.prompt("Wallet address to watch", trader ?? "");
     if (entered === null) return;
     setTrader(entered.trim() || null);
@@ -65,9 +65,10 @@ export function Header() {
 
       <div className="right">
         <span className={`cluster ${config.cluster}`}>{config.cluster}</span>
-        <button type="button" className="btn" onClick={chooseTrader}>
-          {trader ? shortAddress(trader) : "Watch a wallet"}
+        <button type="button" className="btn" onClick={watchAddress} title="Look at any wallet's position without connecting">
+          {trader ? shortAddress(trader) : "Watch"}
         </button>
+        <ConnectButton />
         <a className="btn" href={config.siteUrl}>
           About
         </a>

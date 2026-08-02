@@ -31,9 +31,11 @@
     // type checker says so here instead of the test runner discovering it.
     "erasableSyntaxOnly": true,
 
-    // The SDK is consumed as source rather than as a built package. It has no build step
-    // of its own worth waiting on, and one resolution rule means a change to the wire
-    // format is a type error here immediately rather than after a publish.
+    // npm links the SDK to `ts/sdk`, and its `exports` map sends Node and Vite to source.
+    // The type checker follows the `types` condition instead, which points at `dist` — a
+    // build artefact that is gitignored and absent in CI. This aims tsc at the same source
+    // the other two already resolve to, so all three read one copy and no build step sits
+    // between editing the SDK and type-checking the app against it.
     "paths": {
       "@clobdex/sdk": ["../ts/sdk/src/index.ts"]
     }
