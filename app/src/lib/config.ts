@@ -35,14 +35,14 @@ export interface Config {
   readonly siteUrl: string | null;
 }
 
-/** Where `cargo run -p clob-stream` binds unless `BIND` says otherwise. */
+/** Where `cargo run` in `crates/clob-stream` binds unless `BIND` says otherwise. */
 const LOCAL_INDEXER = "http://localhost:8080";
 
 /** Where `npm run dev` serves the marketing site from. */
 const LOCAL_SITE = "http://localhost:4321";
 
 /** The program this repository deploys to devnet, as recorded in `.env.example`. */
-const DEVNET_PROGRAM = "DaNh1Gk3xCLwzHhFQZTgLZuvUMS8YyfPqzs9ZgqFqhTe";
+const DEVNET_PROGRAM = "DaNh1GkExAEmfJ2TzKaSDPckq47uwYuDzL9aeGU9fiqK";
 
 const PUBLIC_DEVNET_RPC = "https://api.devnet.solana.com";
 

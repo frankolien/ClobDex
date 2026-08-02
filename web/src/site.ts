@@ -46,7 +46,7 @@ export const links = {
 export const status = {
   cluster: "Devnet",
   audited: false,
-  programAddress: "DaNh1Gk3xCLwzHhFQZTgLZuvUMS8YyfPqzs9ZgqFqhTe",
+  programAddress: "DaNh1GkExAEmfJ2TzKaSDPckq47uwYuDzL9aeGU9fiqK",
 } as const;
 
 /**

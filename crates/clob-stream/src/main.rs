@@ -313,19 +313,27 @@ fn install_crypto_provider() -> Result<()> {
 }
 
 /// Loads `.env` into the environment without overwriting anything already set.
+/// Loads `.env`, searching upward from the working directory.
+///
+/// Upward, because the four off-chain crates are separate Cargo workspaces and therefore
+/// have to be run from their own directories, while the `.env` they read sits at the
+/// repository root. Looking only in the working directory meant the file was never found
+/// by the exact command the README tells you to run.
+///
+/// `dotenvy` rather than a hand-rolled parser: it already does the ancestor search, it
+/// handles quoting and escapes, and two copies of a `.env` parser in two workspaces is two
+/// things that can disagree about what a value is.
+///
+/// It reports what it did. The previous version returned silently when no file was found,
+/// so a missing `.env` surfaced several lines later as "CLOB_PROGRAM_ID is not set" — true,
+/// and silent about the file that would have set it. Only the path is printed; the values
+/// are the reason the file is gitignored.
 fn load_dotenv() {
-    let Ok(contents) = std::fs::read_to_string(".env") else {
-        return;
-    };
-    for line in contents.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
+    match dotenvy::dotenv() {
+        Ok(path) => eprintln!("read {}", path.display()),
+        Err(error) if error.not_found() => {
+            eprintln!("no .env found here or in any parent directory — using the environment")
         }
-        if let Some((key, value)) = line.split_once('=')
-            && std::env::var(key.trim()).is_err()
-        {
-            unsafe { std::env::set_var(key.trim(), value.trim()) };
-        }
+        Err(error) => eprintln!("could not read .env: {error}"),
     }
 }

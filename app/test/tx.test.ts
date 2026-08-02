@@ -9,7 +9,7 @@ import type { MarketAddresses } from "@clobdex/sdk";
 import { roleOf, signatureToString, toKit } from "../src/lib/tx.ts";
 
 const addresses: MarketAddresses = {
-  programAddress: "DaNh1Gk3xCLwzHhFQZTgLZuvUMS8YyfPqzs9ZgqFqhTe",
+  programAddress: "DaNh1GkExAEmfJ2TzKaSDPckq47uwYuDzL9aeGU9fiqK",
   market: "Co2FDvpv1111111111111111111111111111zh8ymY",
   baseVault: "BaseVau1t11111111111111111111111111111111111",
   quoteVault: "QuoteVau1t1111111111111111111111111111111111",

@@ -35,6 +35,7 @@ reqwest = { version = "0.13.4", features = ["json"] }
 rustls = { version = "0.23.43", default-features = false, features = ["aws-lc-rs"] }
 async-trait = "0.1.91"
 actix-cors = "0.7.1"
+dotenvy = "0.15.7"
 
 [dev-dependencies]
 async-trait = "0.1.91"
